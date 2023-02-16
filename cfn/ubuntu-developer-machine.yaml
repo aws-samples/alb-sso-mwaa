@@ -1,0 +1,316 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  AWS Ubuntu Developer Machine
+Parameters:
+  AWSUbuntuAMIType:
+    Description: Ubuntu Pro 22.04 LTS.
+    Type: String
+    Default: "UbuntuPro2204LTS"
+    AllowedValues:
+      - "UbuntuPro2204LTS"
+
+  VpcId:
+    Description: Machine VPC ID
+    Type: 'AWS::EC2::VPC::Id'
+  VpcSubnetId:
+    Description: Machine VPC Subnet ID. Subnet must be public for access over Internet.
+    Type: 'AWS::EC2::Subnet::Id'
+  EbsVolumeSize:
+    Default: 200
+    Description: Ebs volume size (GB)
+    Type: Number
+    MinValue: 200
+  EbsVolumeType:
+    Default: 'gp3'
+    Description: Ebs volume type
+    Type: String
+    AllowedValues:
+      - 'gp2'
+      - 'gp3'
+  
+  SecurityGroupId:
+    Description: >-
+     (Optional) Advanced option to specify existing Machine Security Group Id. 
+      Leave blank to create new Security Group.
+    Type: String
+    AllowedPattern: '(^sg-[0-9a-z]+)$|()$'
+    Default: ''
+    ConstraintDescription: Should be a Valid SecurityGroup Id in selected VPC, or blank
+
+  KeyName:
+    Description: >-
+      Name of an existing Amazon EC2 KeyPair to enable SSH and DCV access to the
+      Machine
+    Type: 'AWS::EC2::KeyPair::KeyName'
+  EC2InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: m5.xlarge
+    AllowedValues:
+      - t3.xlarge
+      - t3a.xlarge
+      - m5.xlarge
+      - m5a.xlarge
+  SecurityGroupAccessCIDR:
+    Description: >-
+      Restrict Machine access for SSH and DCV client from a valid CIDR range
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: Must be a valid CIDR range of the form x.x.x.x/x
+  EBSOptimized:
+    Description: >-
+      Is the instance EBS optimized?
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'false'
+      - 'true'
+  UbuntuAMIOverride:
+    Description: >-
+      (Optional) Advanced option to override the default Ubuntu AMI.  
+      Leave blank, if unsure.
+    Type: String
+    AllowedPattern: '(ami-[0-9a-z]{17})?'
+
+Mappings:
+  UbuntuPro2204LTS:
+    us-east-1:
+      AMI: ami-0849d760c131d2ae7
+    us-east-2:
+      AMI: ami-0de19b31027aa3556
+    us-west-2:
+      AMI: ami-0a025cd581aa80623
+    eu-west-1:
+      AMI: ami-06d076a224fc9d4cf
+    eu-central-1:
+      AMI: ami-0f012ece49d117358
+    ap-southeast-1:
+      AMI: ami-0877ab34f6e8ed25d
+    ap-southeast-2:
+      AMI: ami-01b41e8d3dc06ee9e
+    ap-south-1:
+      AMI: ami-01007eef7010318b6
+    ap-northeast-1:
+      AMI: ami-0cb1490955e291a4a
+    ap-northeast-2:
+      AMI: ami-07b1dbd222ca38f4a
+
+Conditions:
+  OverrideAMI: !Not 
+    - !Equals 
+      - !Ref UbuntuAMIOverride
+      - ''
+  CreateNewSecurityGroup: !Equals 
+    - !Ref SecurityGroupId
+    - ''
+
+Resources:
+  
+  MachineSecurityGroup:
+    Condition: CreateNewSecurityGroup
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Machine security group
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+
+  MachineSecurityGroupCIDRIngressSSH: 
+    Condition: CreateNewSecurityGroup
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      Description: Ingress from CIDR for SSH access to graphics Machine
+      GroupId: !GetAtt MachineSecurityGroup.GroupId
+      CidrIp: !Ref SecurityGroupAccessCIDR
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+  
+  MachineSecurityGroupCIDREgress: 
+    Condition: CreateNewSecurityGroup
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    Properties:
+      Description: Egress rule for out bound traffic
+      GroupId: !GetAtt MachineSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+      CidrIp: '0.0.0.0/0'
+
+  InstanceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/PowerUserAccess
+      Policies:
+        - PolicyName: iam-policies
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - "iam:GetRole"
+                  - "iam:CreateRole"
+                  - "iam:AttachRolePolicy"
+                  - "iam:PutRolePolicy"
+                  - "iam:DeleteRolePolicy"
+                  - "iam:DetachRolePolicy"
+                  - "iam:DeleteRole"
+                Resource: 
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/cdk*${AWS::AccountId}-${AWS::Region}'
+        
+  InstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: /
+      Roles:
+        - !Ref InstanceRole
+  
+  MachineLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties: 
+      LaunchTemplateData: 
+        MetadataOptions:
+          HttpTokens: "required"
+          HttpEndpoint: "enabled"
+
+  MachineInstance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref MachineLaunchTemplate
+        Version: !GetAtt MachineLaunchTemplate.LatestVersionNumber
+      ImageId: !If 
+        - OverrideAMI
+        - !Ref UbuntuAMIOverride
+        - !FindInMap 
+          - !Ref 'AWSUbuntuAMIType'
+          - !Ref 'AWS::Region'
+          - AMI
+      InstanceType: !Ref EC2InstanceType
+      EbsOptimized: !Ref EBSOptimized
+      IamInstanceProfile: !Ref InstanceProfile
+      BlockDeviceMappings:
+        - DeviceName: "/dev/sda1"
+          Ebs:
+            VolumeSize: !Ref EbsVolumeSize
+            VolumeType: !Ref EbsVolumeType
+            Encrypted: true
+            DeleteOnTermination: true
+      NetworkInterfaces: 
+      - AssociatePublicIpAddress: true
+        DeviceIndex: "0"
+        GroupSet: 
+          - !If
+            - CreateNewSecurityGroup
+            - !GetAtt MachineSecurityGroup.GroupId
+            - !Ref SecurityGroupId
+
+        SubnetId: !Ref VpcSubnetId
+
+      KeyName: !Ref KeyName
+      Tags: 
+        - Key: "Name"
+          Value: !Sub '${AWS::StackName}-developer-machine'
+
+      UserData: !Base64 
+        'Fn::Join':
+          - ''
+          - - |
+              Content-Type: multipart/mixed; boundary="//"
+              MIME-Version: 1.0
+
+              --//
+              Content-Type: text/cloud-config; charset="us-ascii"
+              MIME-Version: 1.0
+              Content-Transfer-Encoding: 7bit
+              Content-Disposition: attachment; filename="cloud-config.txt"
+
+              #cloud-config
+              cloud_final_modules:
+              - [scripts-user, always]
+
+              --//
+              Content-Type: text/x-shellscript; charset="us-ascii"
+              MIME-Version: 1.0
+              Content-Transfer-Encoding: 7bit
+              Content-Disposition: attachment; filename="userdata.txt"
+
+              #!/bin/bash -xe
+
+              echo "Cloud init in progress!" > /etc/motd
+              
+              # Find Ubuntu Version 
+              VERSION=$(lsb_release -a | grep Release | awk -F ":" '{print $2}' | sed -E -e 's/[[:blank:]]+//g')
+              echo "Detected Ubuntu $VERSION"
+              
+              # setup graphics Machine
+              export DEBIAN_FRONTEND=noninteractive
+              export DEBCONF_NONINTERACTIVE_SEEN=true
+
+              # setup software repo for docker
+              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+              apt-key fingerprint 0EBFCD88
+              add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+   
+              # update and install required packages
+              apt-get update
+
+              apt-get -y install git tar
+              apt-get -y install apt-transport-https ca-certificates curl gnupg-agent software-properties-common
+              
+              # install docker if it is not installed
+              if [ ! -x "$(command -v docker)" ]; then
+                apt-get -y install docker-ce docker-ce-cli containerd.io      
+                usermod -aG docker ubuntu
+              fi
+
+              # install aws cli
+              apt-get -y install awscli
+
+              # install nodejs
+              NODE_VERSION=v18.13.0
+              NODE_DISTRO=linux-x64
+              wget https://nodejs.org/dist/$NODE_VERSION/node-$NODE_VERSION-$NODE_DISTRO.tar.xz
+              mkdir -p /usr/local/lib/nodejs
+              tar -xJvf node-$NODE_VERSION-$NODE_DISTRO.tar.xz -C /usr/local/lib/nodejs
+              echo "export PATH=/usr/local/lib/nodejs/node-$NODE_VERSION-$NODE_DISTRO/bin:$PATH" > /home/ubuntu/.bashrc
+            
+              # install aws cdk
+              export PATH=/usr/local/lib/nodejs/node-$NODE_VERSION-$NODE_DISTRO/bin:$PATH 
+              npm install -g aws-cdk
+
+              # Link python to python3
+              ln -s /usr/bin/python3 /usr/bin/python
+
+              # install pip
+              apt-get install -y python3-pip
+
+              # install virtual env package
+              python3 -m pip install virtualenv
+
+              echo "AWS developer machine is ready!" > /etc/motd
+Outputs:
+  MachineInstanceId:
+    Description: Machine instance Id
+    Value: !Ref MachineInstance
+  MachineRole:
+    Description: IAM role attached to Machine instance profile
+    Value: !GetAtt InstanceRole.Arn
+  MachineSecurityGroup:
+    Description: Machine security group
+    Value: !If
+      - CreateNewSecurityGroup
+      - !GetAtt MachineSecurityGroup.GroupId
+      - !Ref SecurityGroupId

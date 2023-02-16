@@ -1,0 +1,80 @@
+{
+  "AppName": "MwaaSSO",
+  "Oidc": {
+    "ClientId": "...",
+    "ClientSecretArn": "...",
+    "Issuer": "...",
+    "AuthorizationEndpoint":"...",
+    "TokenEndpoint":"...",
+    "UserInfoEndpoint":"..."
+  },
+  "Alb": {
+    "InternetFacing": false,
+    "SessionCookieName": "AWSELBAuthSessionCookie",
+    "LogBucketArn": "...",
+    "LogBucketPrefix": "customer-alb",
+    "CertificateArn": "..."
+  },
+  "MwaaEnvironments": [
+    {
+      "Name": "Env1",
+      "EnvironmentClass": "mw1.large",
+      "SourceBucketArn": "...",
+      "DagsS3Path": "dags",
+      "RequirementsS3Path": "mwaa/requirements-mwaa.txt",
+      "RequirementsS3ObjectVersion": "...",
+      "MinWorkers": 2,
+      "MaxWorkers": 16,
+      "Schedulers": 2,
+      "DagProcessingLogsLevel": "INFO",
+      "SchedulerLogsLevel": "INFO",
+      "TaskLogsLevel": "INFO",
+      "WorkerLogsLevel": "INFO",
+      "WebserverLogsLevel": "INFO",
+      "WebServerAccessMode": "PUBLIC_ONLY",
+      "ConfigurationOptions": {
+        "core.dag_run_conf_overrides_params": "True"
+      },
+      "AWSServiceRoleForAutoScalingArn": "...",
+      "VpcCIDR": "172.30.0.0/16",
+      "MaxAZs": 2,
+      "NatGateways": 1,
+      "PublicSubnetMask": 24,
+      "PrivateSubnetMask": 18
+    },
+    {
+      "Name": "Env2",
+      "EnvironmentClass": "mw1.large",
+      "SourceBucketArn": "...",
+      "DagsS3Path": "dags",
+      "RequirementsS3Path": "mwaa/requirements-mwaa.txt",
+      "RequirementsS3ObjectVersion": "...",
+      "MinWorkers": 2,
+      "MaxWorkers": 16,
+      "Schedulers": 2,
+      "DagProcessingLogsLevel": "INFO",
+      "SchedulerLogsLevel": "INFO",
+      "TaskLogsLevel": "INFO",
+      "WorkerLogsLevel": "INFO",
+      "WebserverLogsLevel": "INFO",
+      "WebServerAccessMode": "PRIVATE_ONLY",
+      "ConfigurationOptions": {
+        "core.dag_run_conf_overrides_params": "True"
+      },
+      "AWSServiceRoleForAutoScalingArn": "...",
+      "VpcCIDR": "172.16.0.0/16",
+      "MaxAZs": 2,
+      "NatGateways": 1,
+      "PublicSubnetMask": 24,
+      "PrivateSubnetMask": 18
+    }
+  ],
+  "CustomerVpc": {
+    "AWSServiceRoleForAutoScalingArn": "...",
+    "VpcCIDR": "192.168.0.0/16",
+    "MaxAZs": 2,
+    "NatGateways": 1,
+    "PublicSubnetMask": 24,
+    "PrivateSubnetMask": 18
+  }
+}

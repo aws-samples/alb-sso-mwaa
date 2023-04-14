@@ -4,11 +4,60 @@
 
 This solution enables OpenID Connect (OIDC) single-sign-on (SSO) authentication and authorization for accessing [Apache Airflow](https://airflow.apache.org/docs/apache-airflow/stable/index.html) UI across multiple [Amazon Managed Workflows for Apache Airflow (MWAA)](https://aws.amazon.com/managed-workflows-for-apache-airflow/) Environments. Although not required, this solution can also be used to provision target MWAA Environments with `PUBLIC_ONLY` and  `PRIVATE_ONLY` access. 
 
-In the following sections, we describe the [solution architecture](#solution-architecture), [system](#system-perspective) and [user](#user-perspective) perspectives for understanding the solution, [prerequisites](#prerequisites), and [step-by-step tutorial](#step-by-step-tutorial) for deploying and using the solution.
+In the following sections, we first describe the limited [quick start](#quick-start) option, followed by the comprehensive [solution architecture](#solution-architecture), [system](#system-perspective) and [user](#user-perspective) perspectives for understanding the completed solution, [prerequisites](#prerequisites), and [step-by-step tutorial](#step-by-step-tutorial) for deploying and using the detailed solution.
+
+## Quick start
+
+If you *just* need to use an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) to provide OIDC based SSO to a *single exsiting* MWAA environment with [Apache Airflow Admin](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) role based access, you only need to complete the steps described below in the [Quick start](#quick-start) section. Under this option, all HTTPS traffic between your browser and the MWAA UI console flows through the ALB, and all ALB SSO users have `Admin` access to the single MWAA environment.
+
+### Setup
+
+Complete the [prerequisites](#prerequisites), and run the script [setup-venv.sh](setup-venv.sh). 
+
+Complete `Oidc` and `Alb` contexts in [cdk.context.json](cdk/cdk.context.json). The `Oidc` context specifies the configuration of your OIDC Idp. For example, for [Okta OIDC Idp](https://developer.okta.com/signup/), the configuration would be similar to shown below:
+
+    "Oidc": {
+        "ClientId": "...",
+        "ClientSecretArn": "...",
+        "Issuer": "https://xxx.okta.com/oauth2/default",
+        "AuthorizationEndpoint":"https://xxx.okta.com/oauth2/default/v1/authorize",
+        "TokenEndpoint":"https://xxx.okta.com/oauth2/default/v1/token",
+        "UserInfoEndpoint":"https://xxx.okta.com/oauth2/default/v1/userinfo"
+    }
+
+
+The ALB may be internet facing, or private. By default, the **ALB is private**. Set `InternetFacing` to `true` below for internet facing ALB:
+
+    "Alb": {
+        "InternetFacing": false,
+        "SessionCookieName": "AWSELBAuthSessionCookie",
+        "LogBucketArn": "...",
+        "LogBucketPrefix": "customer-alb",
+        "CertificateArn": "..."
+    }
+
+Complete `QuickStart` in  [cdk.context.json](cdk/cdk.context.json) using information obtained from your *existing* MWAA environment. You must specify at least two subnets in two different AWS availability zones in the `SubnetIds` below. To specify the  `MwaaEndpointIps` below, find the MWAA endpoint IPs using [AWS console or CLI](https://docs.aws.amazon.com/mwaa/latest/userguide/vpc-vpe-access.html#vpc-vpe-hosts).
+
+    "QuickStart": {
+        "VpcId": "...",
+        "SubnetIds": [],
+        "SecurityGroupId": "...",
+        "MwaaEnvironmentName": "...",
+        "RbacRoleName": "Admin",
+        "MwaaEndpointIps": []
+    }
+
+
+
+Run following commands:
+
+    cd cdk
+    cdk deploy QuickStartAlb
+
 
 ## Solution architecture
 
-The central component of the solution architecture is an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) setup with a fully-qualified domain name (FQDN) and public (internet), or private access. The ALB provides SSO access to multiple MWAA Environments. 
+The central component of the solution architecture is an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) setup with a fully-qualified domain name (FQDN) and public (internet), or private access. The ALB provides SSO access to one or more MWAA Environments. 
 
 The user-agent (web browser) call flow for accessing an Apache Airflow console in the target MWAA environment is as follows:
 
@@ -164,12 +213,7 @@ The `797873946194` above refers to the AWS account id for AWS load-balancing ser
 
 ## Step-by-step tutorial
 
-To deploy the AWS CDK stacks in this solution, clone this github repository on your *build machine*. In the root directory of the cloned repository, execute following commands:
-
-    python -m virtualenv .venv
-    source ./.venv/bin/activate
-    cd ./cdk
-    pip install -r requirements-dev.txt
+To deploy the AWS CDK stacks in this solution, clone this github repository on your *build machine*. In the root directory of the cloned repository, execute [setup-venv.sh](setup-venv.sh) shell script.
     
 Below we describe the steps required to deploy this solution.
 

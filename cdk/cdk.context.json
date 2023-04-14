@@ -15,6 +15,14 @@
     "LogBucketPrefix": "customer-alb",
     "CertificateArn": "..."
   },
+  "QuickStart": {
+    "VpcId": "...",
+    "SubnetIds": [],
+    "SecurityGroupId": "...",
+    "MwaaEnvironmentName": "...",
+    "RbacRoleName": "Admin",
+    "MwaaEndpointIps": []
+  },
   "MwaaEnvironments": [
     {
       "Name": "Env1",

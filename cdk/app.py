@@ -23,6 +23,7 @@ from mwaa_stacks.mwaa_stack import MwaaStack
 from customer_vpc_stack.vpc_stack import CustomerVpcStack
 from mwaa_authx_lambda_stack.lambda_stack import MwaaAuthxLambdaStack
 from customer_alb_stack.alb_stack import CustomerAlbStack
+from quickstart_stack.quickstart_stack import QuickStartStack
 import os
 
 logger = logging.getLogger("mars_app")
@@ -34,6 +35,8 @@ aws_cdk.Aspects.of(app).add(AwsSolutionsChecks())
 
 app_name = app.node.try_get_context("AppName")
 env=aws_cdk.Environment(account=os.getenv('CDK_DEFAULT_ACCOUNT'), region=os.getenv('CDK_DEFAULT_REGION'))
+
+quickstart_stack = QuickStartStack(app, "QuickStartAlb", stack_name = f"{app_name}-QuickStartAlb", env=env)
 
 customer_vpc_stack = CustomerVpcStack(app, "CustomerVpc", 
     stack_name = f"{app_name}-CustomerVpc", env=env)

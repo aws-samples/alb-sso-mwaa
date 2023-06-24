@@ -13,11 +13,9 @@ In the following sections, we first describe the limited [Quick start](#quick-st
 ## Solution architecture
 
 The solution architecture diagram with numbered call flow sequence for internet network reachability is shown below:
-
 ![Internet Solution architecture](images/mwaa-sso-public-call-flow.png)
 
 The solution architecture diagram for AWS Client VPN network reachability is shown below:
-
 ![VPN Solution architecture](images/mwaa-sso-private-call-flow.png)
 
 The central component of the solution architecture is an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) setup with a fully-qualified domain name (FQDN) and public (internet), or private access. The ALB provides SSO access to one or more Amazon MWAA Environments. 
@@ -47,8 +45,8 @@ This solution can
 |---------|-------------|--------------------|
 |Integrate to a single existing Amazon MWAA environment|  If you are integrating with a single existing Amazon MWAA environment, follow the guides in the Quickstart section. The Quickstart requires that you specify the same ALB VPC as that of your existing Amazon MWAA VPC. You can specify the default Apache Airflow RBAC role that all users will assume. The ALB with an HTTPS listener is configured within your existing Amazon MWAA VPC.| [Quick start](#quick-start) |
 |Integrate to multiple existing Amazon MWAA environments| For connecting to multiple existing Amazon MWAA environments, specify only the Amazon MWAA environment names in the JSON file. The setup process will create a new VPC with subnets hosting the ALB and the listener. You must define the CIDR range for this ALB VPC such that it does not overlap with the VPC CIDR range of your existing Amazon MWAA VPCs. | [Integrate to multiple existing Amazon MWAA environments](#integrate-to-multiple-existing-amazon-mwaa-environments)|
-| Create a single new Amazon MWAA environment with built-in integration | The setup process will create an ALB VPC, an ALB with an HTTPS listener, an AWS Lambda Authorizer, an Amazon DynamoDB table, the respective Amazon MWAA VPCs and an Amazon MWAA environment in them. Further, it creates the VPC peering connection between the ALB VPC and the Amazon MWAA VPC. | [Create a new Amazon MWAA environment](#create-a-new-amazon-mwaa-environment) |
-| Create multiple new Amazon MWAA environments with built-in integration| The setup process will create an ALB VPC, an ALB with an HTTPS listener, an AWS Lambda Authorizer, an Amazon DynamoDB table, the respective Amazon MWAA VPCs and Amazon MWAA environments in them. Further, it creates the VPC peering connection between the ALB VPC and the Amazon MWAA VPC.| [Create multiple new Amazon MWAA environments](#create-multiple-new-amazon-mwaa-environments) |
+| Create a single new Amazon MWAA environment with built-in integration | For creating a new Amazon MWAA environment, specify only the Amazon MWAA environment name in the JSON file. The setup process will create an ALB VPC, an ALB with an HTTPS listener, an AWS Lambda Authorizer, an Amazon DynamoDB table, the respective Amazon MWAA VPCs and an Amazon MWAA environment in them. Further, it creates the VPC peering connection between the ALB VPC and the Amazon MWAA VPC. | [Create a new Amazon MWAA environment](#create-a-new-amazon-mwaa-environment) |
+| Create multiple new Amazon MWAA environments with built-in integration| For creating multiple new Amazon MWAA environments, specify only the Amazon MWAA environment names in the JSON file. The setup process will create an ALB VPC, an ALB with an HTTPS listener, an AWS Lambda Authorizer, an Amazon DynamoDB table, the respective Amazon MWAA VPCs and Amazon MWAA environments in them. Further, it creates the VPC peering connection between the ALB VPC and the Amazon MWAA VPC.| [Create multiple new Amazon MWAA environments](#create-multiple-new-amazon-mwaa-environments) |
 
 ## Quick start
 

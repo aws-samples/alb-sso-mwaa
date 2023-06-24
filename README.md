@@ -4,9 +4,38 @@
 
 This is the accompanying solution to the AWS blogpost "Automating secure access to multiple Amazon MWAA environments using existing OpenID Connect (OIDC) single-sign-on (SSO) authentication and authorization"
 
-This solution enables OpenID Connect (OIDC) single-sign-on (SSO) authentication and authorization for accessing [Apache Airflow](https://airflow.apache.org/docs/apache-airflow/stable/index.html) UI across multiple [Amazon Managed Workflows for Apache Airflow (MWAA)](https://aws.amazon.com/managed-workflows-for-apache-airflow/) Environments. Although not required, this solution can also be used to provision target MWAA Environments with `PUBLIC_ONLY` and  `PRIVATE_ONLY` access. 
+This solution enables OpenID Connect (OIDC) single-sign-on (SSO) authentication and authorization for accessing [Apache Airflow](https://airflow.apache.org/docs/apache-airflow/stable/index.html) UI across multiple existing [Amazon Managed Workflows for Apache Airflow (MWAA)](https://aws.amazon.com/managed-workflows-for-apache-airflow/) Environments. 
+
+Although not required, this solution can also be used to provision new Amazon MWAA Environments with either `PUBLIC_ONLY` and  `PRIVATE_ONLY` access modes. The new environments provisioned through this solution would be created with the OpenID Connect (OIDC) single-sign-on (SSO) authentication and authorization integration built-in. 
 
 In the following sections, we first describe the limited [quick start](#quick-start) option, followed by the comprehensive [solution architecture](#solution-architecture), [system](#system-perspective) and [user](#user-perspective) perspectives for understanding the comprehensive solution, [prerequisites](#prerequisites), and [step-by-step tutorial](#step-by-step-tutorial) for deploying and using the detailed solution.
+
+## Solution architecture
+
+The central component of the solution architecture is an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) setup with a fully-qualified domain name (FQDN) and public (internet), or private access. The ALB provides SSO access to one or more Amazon MWAA Environments. 
+
+The user-agent (web browser) call flow for accessing an Apache Airflow console in the target Amazon MWAA environment is as follows:
+
+1. User-agent resolves ALB DNS domain name from DNS resolver. 
+2. User-agent sends login request to the ALB path `/aws_mwaa/aws-console-sso` with the target MWAA Environment and the [Apache Airflow role based access control (RBAC) role](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) in the query parameters `mwaa_env` and `rbac_role`, respectively.
+3. ALB redirects the user-agent to the OIDC identity provider (Idp) authentication endpoint, and the user-agent authenticates with the OIDC Idp.
+4. If user authentication is successful, the OIDC Idp redirects the user-agent to the configured ALB `redirect_url` with authorization `code` included in the redirect URL.
+5. ALB uses the authorization `code` to get `access_token` and OpenID JWT token with `"openid email"` scope from the OIDC Idp, and forwards the login request to the MWAA Authenticator Lambda target with the JWT token included in the request header `x-amzn-oidc-data`.
+6.  MWAA Authenticator Lambda verifies the JWT token in the request header using ALB public keys, and [authorizes](#add-authorization-records-to-dynamodb-table) the authenticated user for the requested `mwaa_env` and `rbac_role` using a DynamoDB table. The use of DynamoDB for authorization is optional, and the [Lambda code](cdk/mwaa_authx_lambda_code/mwaa_authx.py) function `is_allowed` can be adapted to use other authorization mechanisms.
+7. MWAA Authenticator Lambda redirects the user-agent to the Apache Airflow console in the requested MWAA Environment with `login` token included in the `redirect` URL.
+
+
+This solution architecture assumes that the user-agent has network reachability to the AWS Application Load Balancer and Apache Airflow console endpoints used in this solution. If the endpoints are public, then reachability is over the internet, otherwise, the network reachability is assumed via an [AWS Direct Connect](https://aws.amazon.com/directconnect/), or [AWS Client VPN](https://docs.aws.amazon.com/vpn/latest/clientvpn-admin/what-is.html).
+
+The solution architecture diagram with numbered call flow sequence for internet network reachability is shown below:
+
+![Internet Solution architecture](images/mwaa-sso-public-call-flow.png)
+
+The solution architecture diagram for AWS Client VPN network reachability is shown below:
+
+![VPN Solution architecture](images/mwaa-sso-private-call-flow.png)
+
+**NOTE: This solution does not setup up AWS Client VPN.**
 
 ## Quick start
 
@@ -57,32 +86,7 @@ Run following commands:
     cdk deploy QuickStartAlb
 
 
-## Solution architecture
 
-The central component of the solution architecture is an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) setup with a fully-qualified domain name (FQDN) and public (internet), or private access. The ALB provides SSO access to one or more MWAA Environments. 
-
-The user-agent (web browser) call flow for accessing an Apache Airflow console in the target MWAA environment is as follows:
-
-1. User-agent resolves ALB DNS domain name from DNS resolver. 
-2. User-agent sends login request to the ALB path `/aws_mwaa/aws-console-sso` with the target MWAA Environment and the [Apache Airflow role based access control (RBAC) role](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) in the query parameters `mwaa_env` and `rbac_role`, respectively.
-3. ALB redirects the user-agent to the OIDC identity provider (Idp) authentication endpoint, and the user-agent authenticates with the OIDC Idp.
-4. If user authentication is successful, the OIDC Idp redirects the user-agent to the configured ALB `redirect_url` with authorization `code` included in the redirect URL.
-5. ALB uses the authorization `code` to get `access_token` and OpenID JWT token with `"openid email"` scope from the OIDC Idp, and forwards the login request to the MWAA Authenticator Lambda target with the JWT token included in the request header `x-amzn-oidc-data`.
-6.  MWAA Authenticator Lambda verifies the JWT token in the request header using ALB public keys, and [authorizes](#add-authorization-records-to-dynamodb-table) the authenticated user for the requested `mwaa_env` and `rbac_role` using a DynamoDB table. The use of DynamoDB for authorization is optional, and the [Lambda code](cdk/mwaa_authx_lambda_code/mwaa_authx.py) function `is_allowed` can be adapted to use other authorization mechanisms.
-7. MWAA Authenticator Lambda redirects the user-agent to the Apache Airflow console in the requested MWAA Environment with `login` token included in the `redirect` URL.
-
-
-This solution architecture assumes that the user-agent has network reachability to the AWS Application Load Balancer and Apache Airflow console endpoints used in this solution. If the endpoints are public, then reachability is over the internet, otherwise, the network reachability is assumed via an [AWS Direct Connect](https://aws.amazon.com/directconnect/), or [AWS Client VPN](https://docs.aws.amazon.com/vpn/latest/clientvpn-admin/what-is.html).
-
-The solution architecture diagram with numbered call flow sequence for internet network reachability is shown below:
-
-![Internet Solution architecture](images/mwaa-sso-public-call-flow.png)
-
-The solution architecture diagram for AWS Client VPN network reachability is shown below:
-
-![VPN Solution architecture](images/mwaa-sso-private-call-flow.png)
-
-**NOTE: This solution does not setup up AWS Client VPN.**
 
 ## System perspective
 

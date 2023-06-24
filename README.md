@@ -37,6 +37,17 @@ The solution architecture diagram for AWS Client VPN network reachability is sho
 
 **NOTE: This solution does not setup up AWS Client VPN.**
 
+## Applicable Use cases
+
+This solution can 
+
+| Purpose | Description | Sectional Reference |
+|---------|-------------|--------------------|
+|Integrate to a single existing Amazon MWAA environment|  If you are integrating with a single existing Amazon MWAA environment, follow the guides in the Quickstart section. The Quickstart requires that you specify the same ALB VPC as that of your existing Amazon MWAA VPC. You can specify the default Apache Airflow RBAC role that all users will assume. The ALB with an HTTPS listener is configured within your existing Amazon MWAA VPC.| Quickstart|
+|Integrate to multiple existing Amazon MWAA environments|If you are integrating with a single existing Amazon MWAA environment, follow the guides in the Quickstart section. | Integrate to multiple existing|
+| Create a new Amazon MWAA environment(with built-in integration | | |
+| Create multiple new Amazon MWAA environments with built-in integration(| | |
+
 ## Quick start
 
 If you need to use an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) to provide OIDC based SSO to a *single exsiting* MWAA environment with uniform [Apache Airflow RBAC](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) role access, you only need to complete the steps described below in the [Quick start](#quick-start) section. Under this option, all HTTPS traffic between your browser and the MWAA UI console flows through the ALB, and all ALB SSO authenticated users have uniform  access to the single MWAA environment.

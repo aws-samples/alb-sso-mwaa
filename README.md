@@ -12,6 +12,14 @@ In the following sections, we first describe the limited [Quick start](#quick-st
 
 ## Solution architecture
 
+The solution architecture diagram with numbered call flow sequence for internet network reachability is shown below:
+
+![Internet Solution architecture](images/mwaa-sso-public-call-flow.png)
+
+The solution architecture diagram for AWS Client VPN network reachability is shown below:
+
+![VPN Solution architecture](images/mwaa-sso-private-call-flow.png)
+
 The central component of the solution architecture is an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) setup with a fully-qualified domain name (FQDN) and public (internet), or private access. The ALB provides SSO access to one or more Amazon MWAA Environments. 
 
 The user-agent (web browser) call flow for accessing an Apache Airflow console in the target Amazon MWAA environment is as follows:
@@ -27,13 +35,7 @@ The user-agent (web browser) call flow for accessing an Apache Airflow console i
 
 This solution architecture assumes that the user-agent has network reachability to the AWS Application Load Balancer and Apache Airflow console endpoints used in this solution. If the endpoints are public, then reachability is over the internet, otherwise, the network reachability is assumed via an [AWS Direct Connect](https://aws.amazon.com/directconnect/), or [AWS Client VPN](https://docs.aws.amazon.com/vpn/latest/clientvpn-admin/what-is.html).
 
-The solution architecture diagram with numbered call flow sequence for internet network reachability is shown below:
 
-![Internet Solution architecture](images/mwaa-sso-public-call-flow.png)
-
-The solution architecture diagram for AWS Client VPN network reachability is shown below:
-
-![VPN Solution architecture](images/mwaa-sso-private-call-flow.png)
 
 **NOTE: This solution does not setup up AWS Client VPN.**
 

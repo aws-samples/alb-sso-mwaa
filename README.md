@@ -112,16 +112,6 @@ For connecting to multiple existing Amazon MWAA environments, specify only the A
         }
     ]
 
-The ALB may be internet facing, or private. By default, the **ALB is private**. Set `InternetFacing` to `true` below for internet facing ALB:
-
-    "Alb": {
-        "InternetFacing": false,
-        "SessionCookieName": "AWSELBAuthSessionCookie",
-        "LogBucketArn": "...",
-        "LogBucketPrefix": "customer-alb",
-        "CertificateArn": "..."
-    }
-
 The `Oidc` context specifies the configuration of your OIDC Idp. For example, for [Okta OIDC Idp](https://developer.okta.com/signup/), the configuration would be similar to shown below:
 
     "Oidc": {
@@ -131,6 +121,16 @@ The `Oidc` context specifies the configuration of your OIDC Idp. For example, fo
         "AuthorizationEndpoint":"https://xxx.okta.com/oauth2/default/v1/authorize",
         "TokenEndpoint":"https://xxx.okta.com/oauth2/default/v1/token",
         "UserInfoEndpoint":"https://xxx.okta.com/oauth2/default/v1/userinfo"
+    }    
+
+The ALB may be internet facing, or private. By default, the **ALB is private**. Set `InternetFacing` to `true` below for internet facing ALB:
+
+    "Alb": {
+        "InternetFacing": false,
+        "SessionCookieName": "AWSELBAuthSessionCookie",
+        "LogBucketArn": "...",
+        "LogBucketPrefix": "customer-alb",
+        "CertificateArn": "..."
     }
 
 Run following commands:
@@ -147,6 +147,68 @@ For integrating with existing Amazon MWAA environments configured using private 
 
 ### Setup
 Complete the [prerequisites](#prerequisites), and run the script [setup-venv.sh](setup-venv.sh).
+
+For creating a new Amazon MWAA environments, specify the Amazon MWAA environment configurations in the JSON [cdk.context.json](cdk/cdk.context.json) file. Additionally, complete `Oidc`, `Alb` and `CustomerVpc` contexts. The setup process will create a new VPC with subnets hosting the ALB and the HTTPS listener as defined by your `CustomerVpc` section configurations. It will also create a new VPC for your new Amazon MWAA environment in it. Finally it will create the VPC peering connections between the ALB VPC and the MWAA VPC. 
+
+You can define the `WebServerAccessMode` to be either `PUBLIC_ONLY` or `PRIVATE_ONLY`. You must define the CIDR range for this ALB VPC such that it does not overlap with the VPC CIDR range of your Amazon MWAA VPCs if the new Amazon MWAA environment is being created with PRIVATE_ONLY access. This is because for this solution to work, we need to establish VPC peering connection and subnet routes between the CustomerVpc and the VPC of any MWAA Environment with PRIVATE_ONLY access.
+
+The `Oidc` context specifies the configuration of your OIDC Idp. For example, for [Okta OIDC Idp](https://developer.okta.com/signup/), the configuration would be similar to shown below:
+
+    "Oidc": {
+        "ClientId": "...",
+        "ClientSecretArn": "...",
+        "Issuer": "https://xxx.okta.com/oauth2/default",
+        "AuthorizationEndpoint":"https://xxx.okta.com/oauth2/default/v1/authorize",
+        "TokenEndpoint":"https://xxx.okta.com/oauth2/default/v1/token",
+        "UserInfoEndpoint":"https://xxx.okta.com/oauth2/default/v1/userinfo"
+    }    
+
+The ALB may be internet facing, or private. By default, the **ALB is private**. Set `InternetFacing` to `true` below for internet facing ALB:
+
+    "Alb": {
+        "InternetFacing": false,
+        "SessionCookieName": "AWSELBAuthSessionCookie",
+        "LogBucketArn": "...",
+        "LogBucketPrefix": "customer-alb",
+        "CertificateArn": "..."
+    }
+
+Define one Amazon MWAA configurations along with the VPC details as defined by the `VpcCIDR`, `MaxAZs`, `NatGateways`, `PublicSubnetMask` and `PrivateSubnetMask` fields.
+
+    "MwaaEnvironments": [
+        {
+            "Name": "Env1",
+            "EnvironmentClass": "mw1.large",
+            "SourceBucketArn": "...",
+            "DagsS3Path": "dags",
+            "RequirementsS3Path": "mwaa/requirements-mwaa.txt",
+            "RequirementsS3ObjectVersion": "...",
+            "MinWorkers": 2,
+            "MaxWorkers": 16,
+            "Schedulers": 2,
+            "DagProcessingLogsLevel": "INFO",
+            "SchedulerLogsLevel": "INFO",
+            "TaskLogsLevel": "INFO",
+            "WorkerLogsLevel": "INFO",
+            "WebserverLogsLevel": "INFO",
+            "WebServerAccessMode": "PUBLIC_ONLY", 
+            "ConfigurationOptions": {
+                "core.dag_run_conf_overrides_params": "True"
+            },
+            "VpcCIDR": "172.30.0.0/16",
+            "MaxAZs": 2,
+            "NatGateways": 1,
+            "PublicSubnetMask": 24,
+            "PrivateSubnetMask": 18
+        }]
+
+Run following commands:
+
+    cd cdk
+    cdk bootstrap
+    cdk deploy --all
+
+Once the setup steps are complete, implement the [Post deployment configuration steps](#post-deployment-configuration). This includes adding the ALB CNAME record to the Amazon Route 53 DNS domain. 
 
 ## Create multiple new Amazon MWAA environments
 

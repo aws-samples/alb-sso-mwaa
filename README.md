@@ -39,7 +39,7 @@ This solution architecture assumes that the user-agent has network reachability 
 
 ## Applicable Use cases
 
-This solution can 
+Use this solution for the following purposes: 
 
 | Purpose | Description | Sectional Reference |
 |---------|-------------|--------------------|
@@ -104,6 +104,7 @@ Complete the [prerequisites](#prerequisites), and run the script [setup-venv.sh]
 For connecting to multiple existing Amazon MWAA environments, specify only the Amazon MWAA environment name in the JSON [cdk.context.json](cdk/cdk.context.json) file. Complete `Oidc`, `Alb` and `CustomerVpc`  contexts and mention the Amazon MWAA environment names only in the `MwaaEnvironments` context. The setup process will create a new VPC with subnets hosting the ALB and the listener as defined by your `CustomerVpc` section configurations. You must define the CIDR range for this ALB VPC such that it does not overlap with the VPC CIDR range of your existing Amazon MWAA VPCs. 
 
 Example to integrate with two existing Amazon MWAA environments names "Env1" and "Env2":
+
     "MwaaEnvironments": [
         {
         "Name": "Env1"
@@ -182,6 +183,7 @@ The ALB may be internet facing, or private. By default, the **ALB is private**. 
 Define one Amazon MWAA configurations along with the VPC details as defined by the `VpcCIDR`, `MaxAZs`, `NatGateways`, `PublicSubnetMask` and `PrivateSubnetMask` fields.
 
 Example to create a new large, public Amazon MWAA environment named "Env1":
+
     "MwaaEnvironments": [
         {
             "Name": "Env1",

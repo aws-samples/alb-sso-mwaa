@@ -145,6 +145,8 @@ For integrating with existing Amazon MWAA environments configured using private 
 
 ## Create a new Amazon MWAA environment
 
+If you need to use an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) to provide OIDC based SSO to a *single new* MWAA environment with uniform [Apache Airflow RBAC](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) role access, you only need to complete the steps described below in this section. Under this option, all HTTPS traffic between your browser and the MWAA UI console flows through the ALB, and all ALB SSO authenticated users have uniform  access to the new created MWAA environment.
+
 ### Setup
 Complete the [prerequisites](#prerequisites), and run the script [setup-venv.sh](setup-venv.sh).
 
@@ -212,9 +214,59 @@ Once the setup steps are complete, implement the [Post deployment configuration 
 
 ## Create multiple new Amazon MWAA environments
 
+If you need to use an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) to provide OIDC based SSO to a *multiple new* MWAA environment with uniform [Apache Airflow RBAC](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) role access, you only need to complete the steps described below in this section. Under this option, all HTTPS traffic between your browser and the MWAA UI console flows through the ALB, and all ALB SSO authenticated users have uniform  access to the many new created MWAA environments.
+
 ### Setup
 Complete the [prerequisites](#prerequisites), and run the script [setup-venv.sh](setup-venv.sh).
 
+Follow the instruction steps for [Create a new Amazon MWAA environment](#create-a-new-amazon-mwaa-environment) except one deviation. Instead of specifying one Amazon MWAA environment configuration in the `MwaaEnvironments` section of the JSON [cdk.context.json](cdk/cdk.context.json) file, append multiple Amazon MWAA definitions.
+
+Multiple Amazon MWAA definitions example:
+
+    "MwaaEnvironments": [
+        {
+            "Name": "Env1",
+            "EnvironmentClass": "mw1.large",
+            "SourceBucketArn": "...",
+            "DagsS3Path": "dags",
+            "RequirementsS3Path": "mwaa/requirements-mwaa.txt",
+            "RequirementsS3ObjectVersion": "...",
+            "MinWorkers": 2,
+            "MaxWorkers": 16,
+            "Schedulers": 2,
+            "DagProcessingLogsLevel": "INFO",
+            "SchedulerLogsLevel": "INFO",
+            "TaskLogsLevel": "INFO",
+            "WorkerLogsLevel": "INFO",
+            "WebserverLogsLevel": "INFO",
+            "WebServerAccessMode": "PUBLIC_ONLY",
+            "ConfigurationOptions": {
+                "core.dag_run_conf_overrides_params": "True"
+            },
+            ...
+        },
+        {
+            "Name": "Env2",
+            "EnvironmentClass": "mw1.large",
+            "SourceBucketArn": "...",
+            "DagsS3Path": "dags",
+            "RequirementsS3Path": "mwaa/requirements-mwaa.txt",
+            "RequirementsS3ObjectVersion": "...",
+            "MinWorkers": 2,
+            "MaxWorkers": 16,
+            "Schedulers": 2,
+            "DagProcessingLogsLevel": "INFO",
+            "SchedulerLogsLevel": "INFO",
+            "TaskLogsLevel": "INFO",
+            "WorkerLogsLevel": "INFO",
+            "WebserverLogsLevel": "INFO",
+            "WebServerAccessMode": "PRIVATE_ONLY",
+            "ConfigurationOptions": {
+                "core.dag_run_conf_overrides_params": "True"
+            },
+            ...
+        }
+    ]
 
 ## System perspective
 The system perspective is useful for building and deploying this solution. This solution comprises of three core CloudFormation stacks defined using AWS CDK: 

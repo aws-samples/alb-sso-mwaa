@@ -103,6 +103,7 @@ Complete the [prerequisites](#prerequisites), and run the script [setup-venv.sh]
 
 For connecting to multiple existing Amazon MWAA environments, specify only the Amazon MWAA environment name in the JSON [cdk.context.json](cdk/cdk.context.json) file. Complete `Oidc`, `Alb` and `CustomerVpc`  contexts and mention the Amazon MWAA environment names only in the `MwaaEnvironments` context. The setup process will create a new VPC with subnets hosting the ALB and the listener as defined by your `CustomerVpc` section configurations. You must define the CIDR range for this ALB VPC such that it does not overlap with the VPC CIDR range of your existing Amazon MWAA VPCs. 
 
+Example to integrate with two existing Amazon MWAA environments names "Env1" and "Env2":
     "MwaaEnvironments": [
         {
         "Name": "Env1"
@@ -143,6 +144,9 @@ Once the setup steps are complete, implement the [Post deployment configuration 
 
 For integrating with existing Amazon MWAA environments configured using private access mode there are additional steps that need to be configured. These include configuring VPC peering and subnet routes between the new ALB VPC and the existing Amazon MWAA VPC. Additionally, you will need to configure network connectivity from your user-agent to the private ALB endpoint resolved by your DNS domain.
 
+### Additional Details: 
+Visit the [Step-by-step tutorial](#step-by-step-tutorial) section for details on the CDK stack that this solution uses.
+
 ## Create a new Amazon MWAA environment
 
 If you need to use an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) to provide OIDC based SSO to a *single new* Amazon MWAA environment with uniform [Apache Airflow RBAC](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) role access, you only need to complete the steps described below in this section. Under this option, all HTTPS traffic between your browser and the MWAA UI console flows through the ALB, and all ALB SSO authenticated users have uniform  access to the newly created Amazon MWAA environment.
@@ -177,6 +181,7 @@ The ALB may be internet facing, or private. By default, the **ALB is private**. 
 
 Define one Amazon MWAA configurations along with the VPC details as defined by the `VpcCIDR`, `MaxAZs`, `NatGateways`, `PublicSubnetMask` and `PrivateSubnetMask` fields.
 
+Example to create a new large, public Amazon MWAA environment named "Env1":
     "MwaaEnvironments": [
         {
             "Name": "Env1",
@@ -212,6 +217,9 @@ Run following commands:
 
 Once the setup steps are complete, implement the [Post deployment configuration steps](#post-deployment-configuration). This includes adding the ALB CNAME record to the Amazon Route 53 DNS domain. 
 
+### Additional Details: 
+Visit the [Step-by-step tutorial](#step-by-step-tutorial) section for details on the CDK stack that this solution uses.
+
 ## Create multiple new Amazon MWAA environments
 
 If you need to use an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) to provide OIDC based SSO to a *multiple new* Amazon MWAA environment with uniform [Apache Airflow RBAC](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) role access, you only need to complete the steps described below in this section. Under this option, all HTTPS traffic between your browser and the Amazon MWAA UI console flows through the ALB, and all ALB SSO authenticated users have uniform  access to the many newly created Amazon MWAA environments.
@@ -221,7 +229,7 @@ Complete the [prerequisites](#prerequisites), and run the script [setup-venv.sh]
 
 Follow the instruction steps for [Create a new Amazon MWAA environment](#create-a-new-amazon-mwaa-environment) except one deviation. Instead of specifying one Amazon MWAA environment configuration in the `MwaaEnvironments` section of the JSON [cdk.context.json](cdk/cdk.context.json) file, append multiple Amazon MWAA definitions.
 
-Multiple Amazon MWAA definitions example:
+Example to create two new large Amazon MWAA environment named "Env1" and "Env2":
 
     "MwaaEnvironments": [
         {
@@ -267,6 +275,9 @@ Multiple Amazon MWAA definitions example:
             ...
         }
     ]
+
+### Additional Details: 
+Visit the [Step-by-step tutorial](#step-by-step-tutorial) section for details on the CDK stack that this solution uses.
 
 ## System perspective
 The system perspective is useful for building and deploying this solution. This solution comprises of three core CloudFormation stacks defined using AWS CDK: 

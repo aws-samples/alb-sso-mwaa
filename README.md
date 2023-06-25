@@ -157,7 +157,7 @@ Complete the [prerequisites](#prerequisites), and run the script [setup-venv.sh]
 
 For creating a new Amazon MWAA environments, specify the Amazon MWAA environment configurations in the JSON [cdk.context.json](cdk/cdk.context.json) file. Additionally, complete `Oidc`, `Alb` and `CustomerVpc` contexts. The setup process will create a new VPC with subnets hosting the ALB and the HTTPS listener as defined by your `CustomerVpc` section configurations. It will also create a new VPC for your new Amazon MWAA environment in it. Finally it will create the VPC peering connections between the ALB VPC and the Amazon MWAA VPC. 
 
-You can define the `WebServerAccessMode` to be either `PUBLIC_ONLY` or `PRIVATE_ONLY`. You must define the CIDR range for this ALB VPC such that it does not overlap with the VPC CIDR range of your Amazon MWAA VPCs if the new Amazon MWAA environment is being created with PRIVATE_ONLY access. This is because for this solution to work, we need to establish VPC peering connection and subnet routes between the CustomerVpc and the VPC of any Amazon MWAA Environment with PRIVATE_ONLY access.
+You can define the `WebServerAccessMode` to be either `PUBLIC_ONLY` or `PRIVATE_ONLY`. You must define the CIDR range for this ALB VPC such that it does not overlap with the VPC CIDR range of your Amazon MWAA VPCs if the new Amazon MWAA environment is being created with PRIVATE_ONLY access. This is because for this solution to work, we need to establish VPC peering connection and subnet routes between the CustomerVpc and the VPC of the new Amazon MWAA Environment with PRIVATE_ONLY access.
 
 The `Oidc` context specifies the configuration of your OIDC Idp. For example, for [Okta OIDC Idp](https://developer.okta.com/signup/), the configuration would be similar to shown below:
 
@@ -180,7 +180,7 @@ The ALB may be internet facing, or private. By default, the **ALB is private**. 
         "CertificateArn": "..."
     }
 
-Define one Amazon MWAA configurations along with the VPC details as defined by the `VpcCIDR`, `MaxAZs`, `NatGateways`, `PublicSubnetMask` and `PrivateSubnetMask` fields.
+Define one Amazon MWAA configurations along with its VPC details as defined by the `VpcCIDR`, `MaxAZs`, `NatGateways`, `PublicSubnetMask` and `PrivateSubnetMask` fields.
 
 Example to create a new large, public Amazon MWAA environment named "Env1":
 

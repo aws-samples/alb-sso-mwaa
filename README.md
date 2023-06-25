@@ -45,8 +45,8 @@ This solution can
 |---------|-------------|--------------------|
 |Integrate to a single existing Amazon MWAA environment|  If you are integrating with a single existing Amazon MWAA environment, follow the guides in the Quickstart section. The Quickstart requires that you specify the same ALB VPC as that of your existing Amazon MWAA VPC. You can specify the default Apache Airflow RBAC role that all users will assume. The ALB with an HTTPS listener is configured within your existing Amazon MWAA VPC.| [Quick start](#quick-start) |
 |Integrate to multiple existing Amazon MWAA environments| For connecting to multiple existing Amazon MWAA environments, specify only the Amazon MWAA environment names in the JSON file. The setup process will create a new VPC with subnets hosting the ALB and the listener. You must define the CIDR range for this ALB VPC such that it does not overlap with the VPC CIDR range of your existing Amazon MWAA VPCs. | [Integrate to multiple existing Amazon MWAA environments](#integrate-to-multiple-existing-amazon-mwaa-environments)|
-| Create a single new Amazon MWAA environment with built-in integration | For creating a new Amazon MWAA environment, specify only the Amazon MWAA environment name in the JSON file. The setup process will create an ALB VPC, an ALB with an HTTPS listener, an AWS Lambda Authorizer, an Amazon DynamoDB table, the respective Amazon MWAA VPCs and an Amazon MWAA environment in them. Further, it creates the VPC peering connection between the ALB VPC and the Amazon MWAA VPC. | [Create a new Amazon MWAA environment](#create-a-new-amazon-mwaa-environment) |
-| Create multiple new Amazon MWAA environments with built-in integration| For creating multiple new Amazon MWAA environments, specify only the Amazon MWAA environment names in the JSON file. The setup process will create an ALB VPC, an ALB with an HTTPS listener, an AWS Lambda Authorizer, an Amazon DynamoDB table, the respective Amazon MWAA VPCs and Amazon MWAA environments in them. Further, it creates the VPC peering connection between the ALB VPC and the Amazon MWAA VPC.| [Create multiple new Amazon MWAA environments](#create-multiple-new-amazon-mwaa-environments) |
+| Create a single new Amazon MWAA environment with built-in integration | For creating a new Amazon MWAA environment, either with Public or Private access mode with in-built OIDC integration. The setup process will create an ALB VPC, an ALB with an HTTPS listener, an AWS Lambda Authorizer, an Amazon DynamoDB table, the respective Amazon MWAA VPCs and an Amazon MWAA environment in them. Further, it creates the VPC peering connection between the ALB VPC and the Amazon MWAA VPC. | [Create a new Amazon MWAA environment](#create-a-new-amazon-mwaa-environment) |
+| Create multiple new Amazon MWAA environments with built-in integration| For creating multiple new Amazon MWAA environments, either with Public or Private access mode with in-built OIDC integration for each of them. The setup process will create an ALB VPC, an ALB with an HTTPS listener, an AWS Lambda Authorizer, an Amazon DynamoDB table, the respective Amazon MWAA VPCs and multiple Amazon MWAA environments in them. Further, it creates the VPC peering connection between the ALB VPC and the Amazon MWAA VPC.| [Create multiple new Amazon MWAA environments](#create-multiple-new-amazon-mwaa-environments) |
 
 ## Quick start
 
@@ -66,7 +66,6 @@ Complete `Oidc` and `Alb` contexts in [cdk.context.json](cdk/cdk.context.json). 
         "TokenEndpoint":"https://xxx.okta.com/oauth2/default/v1/token",
         "UserInfoEndpoint":"https://xxx.okta.com/oauth2/default/v1/userinfo"
     }
-
 
 The ALB may be internet facing, or private. By default, the **ALB is private**. Set `InternetFacing` to `true` below for internet facing ALB:
 
@@ -89,8 +88,6 @@ Complete `QuickStart` in  [cdk.context.json](cdk/cdk.context.json) using informa
         "MwaaEndpointIps": []
     }
 
-
-
 Run following commands:
 
     cd cdk
@@ -99,12 +96,63 @@ Run following commands:
 
 ## Integrate to multiple existing Amazon MWAA environments
 
+### Setup
+Complete the [prerequisites](#prerequisites), and run the script [setup-venv.sh](setup-venv.sh).
+
+For connecting to multiple existing Amazon MWAA environments, specify only the Amazon MWAA environment name in the JSON [cdk.context.json](cdk/cdk.context.json) file. Complete `Oidc`, `Alb` and `CustomerVpc`  contexts and mention the Amazon MWAA environment names only in the `MwaaEnvironments` context. The setup process will create a new VPC with subnets hosting the ALB and the listener as defined by your `CustomerVpc` section configurations. You must define the CIDR range for this ALB VPC such that it does not overlap with the VPC CIDR range of your existing Amazon MWAA VPCs. 
+
+"MwaaEnvironments": [
+    {
+      "Name": "Env1"
+    },
+    {
+      "Name": "Env2"
+    }
+  ],
+
+The ALB may be internet facing, or private. By default, the **ALB is private**. Set `InternetFacing` to `true` below for internet facing ALB:
+
+    "Alb": {
+        "InternetFacing": false,
+        "SessionCookieName": "AWSELBAuthSessionCookie",
+        "LogBucketArn": "...",
+        "LogBucketPrefix": "customer-alb",
+        "CertificateArn": "..."
+    }
+
+The `Oidc` context specifies the configuration of your OIDC Idp. For example, for [Okta OIDC Idp](https://developer.okta.com/signup/), the configuration would be similar to shown below:
+
+    "Oidc": {
+        "ClientId": "...",
+        "ClientSecretArn": "...",
+        "Issuer": "https://xxx.okta.com/oauth2/default",
+        "AuthorizationEndpoint":"https://xxx.okta.com/oauth2/default/v1/authorize",
+        "TokenEndpoint":"https://xxx.okta.com/oauth2/default/v1/token",
+        "UserInfoEndpoint":"https://xxx.okta.com/oauth2/default/v1/userinfo"
+    }
+
+Run following commands:
+
+    cd cdk
+    cdk bootstrap
+    cdk deploy --all
+
+Once the setup steps are complete, implement the [Post deployment configuration steps](#post-deployment-configuration). This includes adding the ALB CNAME record to the Amazon Route 53 DNS domain. 
+
+For integrating with existing Amazon MWAA environments configured using private access mode there are additional steps that need to be configured. These include configuring VPC peering and subnet routes between the new ALB VPC and the existing Amazon MWAA VPC. Additionally, you will need to configure network connectivity from your user-agent to the private ALB endpoint resolved by your DNS domain.
+
 ## Create a new Amazon MWAA environment
+
+### Setup
+Complete the [prerequisites](#prerequisites), and run the script [setup-venv.sh](setup-venv.sh).
 
 ## Create multiple new Amazon MWAA environments
 
-## System perspective
+### Setup
+Complete the [prerequisites](#prerequisites), and run the script [setup-venv.sh](setup-venv.sh).
 
+
+## System perspective
 The system perspective is useful for building and deploying this solution. This solution comprises of three core CloudFormation stacks defined using AWS CDK: 
 
 * CustomerVpc

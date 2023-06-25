@@ -96,19 +96,21 @@ Run following commands:
 
 ## Integrate to multiple existing Amazon MWAA environments
 
+If you need to use an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) to provide OIDC based SSO to a *multiple exsiting* MWAA environment with uniform [Apache Airflow RBAC](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) role access, you only need to complete the steps described below in this section. Under this option, all HTTPS traffic between your browser and the MWAA UI console flows through the ALB, and all ALB SSO authenticated users have uniform  access to the multiple existing MWAA environments.
+
 ### Setup
 Complete the [prerequisites](#prerequisites), and run the script [setup-venv.sh](setup-venv.sh).
 
 For connecting to multiple existing Amazon MWAA environments, specify only the Amazon MWAA environment name in the JSON [cdk.context.json](cdk/cdk.context.json) file. Complete `Oidc`, `Alb` and `CustomerVpc`  contexts and mention the Amazon MWAA environment names only in the `MwaaEnvironments` context. The setup process will create a new VPC with subnets hosting the ALB and the listener as defined by your `CustomerVpc` section configurations. You must define the CIDR range for this ALB VPC such that it does not overlap with the VPC CIDR range of your existing Amazon MWAA VPCs. 
 
-"MwaaEnvironments": [
-    {
-      "Name": "Env1"
-    },
-    {
-      "Name": "Env2"
-    }
-  ],
+    "MwaaEnvironments": [
+        {
+        "Name": "Env1"
+        },
+        {
+        "Name": "Env2"
+        }
+    ]
 
 The ALB may be internet facing, or private. By default, the **ALB is private**. Set `InternetFacing` to `true` below for internet facing ALB:
 

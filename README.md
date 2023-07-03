@@ -11,14 +11,14 @@ Although not required, this solution can also be used to provision new Amazon MW
 In the following sections, we first describe the applicable use cases, followed by the comprehensive [solution architecture](#solution-architecture) and instructions to implement for each of those use cases. Additionally, there is [system](#system-perspective) and [user](#user-perspective) perspectives for understanding the comprehensive solution, [prerequisites](#prerequisites), and [step-by-step tutorial](#step-by-step-tutorial) for deploying and using the detailed solution.
 
 ## Solution architecture
-The solution provisions AWS resources in two distinct patterns required for the specific usecases:
+The solution provisions AWS resources for two distinct patterns required for the specific usecases:
 <ol type="a">
   <li>To provision resources required to provide integration to single existing Amazon MWAA environment as mentioned in the QuickStart section.</li>
   <li>To provision resources required for all other usecases: Integrate to multiple existing Amazon MWAA environments or create one or more new Amazon MWAA environments</li>
 </ol>
 
 ### Architecture for Quickstart
-The solution architecture diagram with numbered call flow sequence for an existing Amazon MWAA environment with Public Access mode is shown below:
+The solution architecture diagram with numbered call flow sequence to integrate with an existing Amazon MWAA environment with Public Access mode is shown below:
 ![Internet Solution architecture](images/quickstart-call-flow.png)
 
 1. User-agent resolves ALB DNS domain name from DNS resolver. 

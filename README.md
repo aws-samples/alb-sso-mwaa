@@ -8,10 +8,28 @@ This solution enables OpenID Connect (OIDC) single-sign-on (SSO) authentication 
 
 Although not required, this solution can also be used to provision new Amazon MWAA Environments with either `PUBLIC_ONLY` and  `PRIVATE_ONLY` access modes. The new environments provisioned through this solution would be created with the OpenID Connect (OIDC) single-sign-on (SSO) authentication and authorization integration built-in. 
 
-In the following sections, we first describe the limited [Quick start](#quick-start) option, followed by the comprehensive [solution architecture](#solution-architecture), [system](#system-perspective) and [user](#user-perspective) perspectives for understanding the comprehensive solution, [prerequisites](#prerequisites), and [step-by-step tutorial](#step-by-step-tutorial) for deploying and using the detailed solution.
+In the following sections, we first describe the applicable use cases, followed by the comprehensive [solution architecture](#solution-architecture) and instructions to implement for each of those use cases. Additionally, there is [system](#system-perspective) and [user](#user-perspective) perspectives for understanding the comprehensive solution, [prerequisites](#prerequisites), and [step-by-step tutorial](#step-by-step-tutorial) for deploying and using the detailed solution.
 
 ## Solution architecture
+The solution provisions AWS resources in two distinct patterns required for the specific usecases:
+<ol type="a">
+  <li>To provision resources required to provide integration to single existing Amazon MWAA environment as mentioned in the QuickStart section.</li>
+  <li>To provision resources required for all other usecases: Integrate to multiple existing Amazon MWAA environments or create one or more new Amazon MWAA environments</li>
+</ol>
 
+### Architecture for Quickstart
+The solution architecture diagram with numbered call flow sequence for an existing Amazon MWAA environment with Public Access mode is shown below:
+![Internet Solution architecture](images/quickstart-call-flow.png)
+
+1. User-agent resolves ALB DNS domain name from DNS resolver. 
+2. User-agent sends login request to the ALB path `/aws_mwaa/aws-console-sso` with the target Amazon MWAA Environment and the [Apache Airflow role based access control (RBAC) role](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) in the query parameters `mwaa_env` and `rbac_role`, respectively.
+3. ALB redirects the user-agent to the OIDC identity provider (Idp) authentication endpoint, and the user-agent authenticates with the OIDC Idp.
+4. If user authentication is successful, the OIDC Idp redirects the user-agent to the configured ALB `redirect_url` with authorization `code` included in the redirect URL.
+5. ALB uses the authorization `code` to get `access_token` and OpenID JWT token with `"openid email"` scope from the OIDC Idp, and forwards the login request to the Amazon MWAA Authenticator Lambda target with the JWT token included in the request header `x-amzn-oidc-data`.
+6.  Amazon MWAA Authenticator Lambda verifies the JWT token in the request header using ALB public keys, and [authorizes](#add-authorization-records-to-dynamodb-table) the authenticated user for the requested `mwaa_env` and `rbac_role` using a DynamoDB table. The use of DynamoDB for authorization is optional, and the [Lambda code](cdk/mwaa_authx_lambda_code/mwaa_authx.py) function `is_allowed` can be adapted to use other authorization mechanisms.
+7. Amazon MWAA Authenticator Lambda routes the user-agent to the Apache Airflow console in the requested Amazon MWAA Environment with login token through the ALB.
+
+### Architecture for Other use cases:
 The solution architecture diagram with numbered call flow sequence for internet network reachability is shown below:
 ![Internet Solution architecture](images/mwaa-sso-public-call-flow.png)
 
@@ -30,10 +48,7 @@ The user-agent (web browser) call flow for accessing an Apache Airflow console i
 6.  Amazon MWAA Authenticator Lambda verifies the JWT token in the request header using ALB public keys, and [authorizes](#add-authorization-records-to-dynamodb-table) the authenticated user for the requested `mwaa_env` and `rbac_role` using a DynamoDB table. The use of DynamoDB for authorization is optional, and the [Lambda code](cdk/mwaa_authx_lambda_code/mwaa_authx.py) function `is_allowed` can be adapted to use other authorization mechanisms.
 7. Amazon MWAA Authenticator Lambda redirects the user-agent to the Apache Airflow console in the requested Amazon MWAA Environment with `login` token included in the `redirect` URL.
 
-
 This solution architecture assumes that the user-agent has network reachability to the AWS Application Load Balancer and Apache Airflow console endpoints used in this solution. If the endpoints are public, then reachability is over the internet, otherwise, the network reachability is assumed via an [AWS Direct Connect](https://aws.amazon.com/directconnect/), or [AWS Client VPN](https://docs.aws.amazon.com/vpn/latest/clientvpn-admin/what-is.html).
-
-
 
 **NOTE: This solution does not setup up AWS Client VPN.**
 
@@ -47,6 +62,8 @@ Use this solution for the following purposes:
 |Integrate to multiple existing Amazon MWAA environments| For connecting to multiple existing Amazon MWAA environments that are already provisioned (either with Public or Private access modes) in your AWS accounts. The setup process will create a new VPC with subnets hosting the ALB and the HTTPS listener. You must define the CIDR range for this ALB VPC such that it does not overlap with the VPC CIDR range of your existing Amazon MWAA VPCs. You can specify the default Apache Airflow RBAC role that all users will assume.| [Integrate to multiple existing Amazon MWAA environments](#integrate-to-multiple-existing-amazon-mwaa-environments)|
 | Create a single new Amazon MWAA environment with built-in integration | For creating a new Amazon MWAA environment, either with Public or Private access mode with in-built OIDC integration. The setup process will create an ALB VPC, an ALB with an HTTPS listener, an AWS Lambda Authorizer, an Amazon DynamoDB table, the respective Amazon MWAA VPCs and an Amazon MWAA environment in them. Further, it creates the VPC peering connection between the ALB VPC and the Amazon MWAA VPC. | [Create a new Amazon MWAA environment](#create-a-new-amazon-mwaa-environment) |
 | Create multiple new Amazon MWAA environments with built-in integration| For creating multiple new Amazon MWAA environments, either with Public or Private access mode with in-built OIDC integration for each of them. The setup process will create an ALB VPC, an ALB with an HTTPS listener, an AWS Lambda Authorizer, an Amazon DynamoDB table, the respective Amazon MWAA VPCs and multiple Amazon MWAA environments in them. Further, it creates the VPC peering connection between the ALB VPC and the Amazon MWAA VPC.| [Create multiple new Amazon MWAA environments](#create-multiple-new-amazon-mwaa-environments) |
+
+
 
 ## Quick start
 

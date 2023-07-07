@@ -26,7 +26,7 @@ The solution architecture diagram with numbered call flow sequence to integrate 
 3. ALB redirects the user-agent to the OIDC identity provider (Idp) authentication endpoint, and the user-agent authenticates with the OIDC Idp.
 4. If user authentication is successful, the OIDC Idp redirects the user-agent to the configured ALB `redirect_url` with authorization `code` included in the redirect URL.
 5. ALB uses the authorization `code` to get `access_token` and OpenID JWT token with `"openid email"` scope from the OIDC Idp, and forwards the login request to the Amazon MWAA Authenticator Lambda target with the JWT token included in the request header `x-amzn-oidc-data`.
-6.  Amazon MWAA Authenticator Lambda verifies the JWT token in the request header using ALB public keys, and [authorizes](#add-authorization-records-to-dynamodb-table) the authenticated user for the requested `mwaa_env` and `rbac_role` using a DynamoDB table. The use of DynamoDB for authorization is optional, and the [Lambda code](cdk/mwaa_authx_lambda_code/mwaa_authx.py) function `is_allowed` can be adapted to use other authorization mechanisms.
+6.  Amazon MWAA Authenticator Lambda verifies the JWT token in the request header using ALB public keys, and uses the configured fixed `rbac_role` to login to the requested `mwaa_env` environment. Quick start option does not perform any user authorization for the configured `rbac_role`.
 7. Amazon MWAA Authenticator Lambda routes the user-agent to the Apache Airflow console in the requested Amazon MWAA Environment with login token through the ALB.
 
 ### Architecture for Other use cases:

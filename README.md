@@ -22,7 +22,7 @@ The solution architecture diagram with numbered call flow sequence to integrate 
 ![Internet Solution architecture](images/quickstart-call-flow.png)
 
 1. User-agent resolves ALB DNS domain name from DNS resolver. 
-2. User-agent sends login request to the ALB path `/aws_mwaa/aws-console-sso` with the target Amazon MWAA Environment and the [Apache Airflow role based access control (RBAC) role](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) in the query parameters `mwaa_env` and `rbac_role`, respectively.
+2. User-agent sends login request to the ALB path `/aws_mwaa/aws-console-sso`.
 3. ALB redirects the user-agent to the OIDC identity provider (Idp) authentication endpoint, and the user-agent authenticates with the OIDC Idp.
 4. If user authentication is successful, the OIDC Idp redirects the user-agent to the configured ALB `redirect_url` with authorization `code` included in the redirect URL.
 5. ALB uses the authorization `code` to get `access_token` and OpenID JWT token with `"openid email"` scope from the OIDC Idp, and forwards the login request to the Amazon MWAA Authenticator Lambda target with the JWT token included in the request header `x-amzn-oidc-data`.

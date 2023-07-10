@@ -4,13 +4,70 @@
 
 This is the accompanying solution to the AWS blogpost "Automating secure access to multiple Amazon MWAA environments using existing OpenID Connect (OIDC) single-sign-on (SSO) authentication and authorization"
 
-This solution enables OpenID Connect (OIDC) single-sign-on (SSO) authentication and authorization for accessing [Apache Airflow](https://airflow.apache.org/docs/apache-airflow/stable/index.html) UI across multiple [Amazon Managed Workflows for Apache Airflow (MWAA)](https://aws.amazon.com/managed-workflows-for-apache-airflow/) Environments. Although not required, this solution can also be used to provision target MWAA Environments with `PUBLIC_ONLY` and  `PRIVATE_ONLY` access. 
+This solution enables OpenID Connect (OIDC) single-sign-on (SSO) authentication and authorization for accessing [Apache Airflow](https://airflow.apache.org/docs/apache-airflow/stable/index.html) UI across multiple existing [Amazon Managed Workflows for Apache Airflow (MWAA)](https://aws.amazon.com/managed-workflows-for-apache-airflow/) Environments. 
 
-In the following sections, we first describe the limited [quick start](#quick-start) option, followed by the comprehensive [solution architecture](#solution-architecture), [system](#system-perspective) and [user](#user-perspective) perspectives for understanding the comprehensive solution, [prerequisites](#prerequisites), and [step-by-step tutorial](#step-by-step-tutorial) for deploying and using the detailed solution.
+Although not required, this solution can also be used to provision new Amazon MWAA Environments with either `PUBLIC_ONLY` and  `PRIVATE_ONLY` access modes. The new environments provisioned through this solution would be created with the OpenID Connect (OIDC) single-sign-on (SSO) authentication and authorization integration built-in. 
+
+In the following sections, we first describe the applicable use cases, followed by the comprehensive [solution architecture](#solution-architecture) and instructions to implement for each of those use cases. Additionally, there is [system](#system-perspective) and [user](#user-perspective) perspectives for understanding the comprehensive solution, [prerequisites](#prerequisites), and [step-by-step tutorial](#step-by-step-tutorial) for deploying and using the detailed solution.
+
+## Solution architecture
+The solution provisions AWS resources for two distinct patterns required for the specific usecases:
+<ol type="a">
+  <li>To provision resources required to provide integration to single existing Amazon MWAA environment as mentioned in the QuickStart section.</li>
+  <li>To provision resources required for all other usecases: Integrate to multiple existing Amazon MWAA environments or create one or more new Amazon MWAA environments</li>
+</ol>
+
+### Architecture for Quickstart
+The solution architecture diagram with numbered call flow sequence to integrate with an existing Amazon MWAA environment with Public Access mode is shown below:
+![Internet Solution architecture](images/quickstart-call-flow.png)
+
+1. User-agent resolves ALB DNS domain name from DNS resolver. 
+2. User-agent sends login request to the ALB path `/aws_mwaa/aws-console-sso`.
+3. ALB redirects the user-agent to the OIDC identity provider (Idp) authentication endpoint, and the user-agent authenticates with the OIDC Idp.
+4. If user authentication is successful, the OIDC Idp redirects the user-agent to the configured ALB `redirect_url` with authorization `code` included in the redirect URL.
+5. ALB uses the authorization `code` to get `access_token` and OpenID JWT token with `"openid email"` scope from the OIDC Idp, and forwards the login request to the Amazon MWAA Authenticator Lambda target with the JWT token included in the request header `x-amzn-oidc-data`.
+6.  Amazon MWAA Authenticator Lambda verifies the JWT token in the request header using ALB public keys, and uses the configured fixed `rbac_role` to login to the requested `mwaa_env` environment. Quick start option does not perform any user authorization for the configured `rbac_role`.
+7. Amazon MWAA Authenticator Lambda routes the user-agent to the Apache Airflow console in the requested Amazon MWAA Environment with login token through the ALB.
+
+### Architecture for Other use cases:
+The solution architecture diagram with numbered call flow sequence for internet network reachability is shown below:
+![Internet Solution architecture](images/mwaa-sso-public-call-flow.png)
+
+The solution architecture diagram for AWS Client VPN network reachability is shown below:
+![VPN Solution architecture](images/mwaa-sso-private-call-flow.png)
+
+The central component of the solution architecture is an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) setup with a fully-qualified domain name (FQDN) and public (internet), or private access. The ALB provides SSO access to one or more Amazon MWAA Environments. 
+
+The user-agent (web browser) call flow for accessing an Apache Airflow console in the target Amazon MWAA environment is as follows:
+
+1. User-agent resolves ALB DNS domain name from DNS resolver. 
+2. User-agent sends login request to the ALB path `/aws_mwaa/aws-console-sso` with the target Amazon MWAA Environment and the [Apache Airflow role based access control (RBAC) role](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) in the query parameters `mwaa_env` and `rbac_role`, respectively.
+3. ALB redirects the user-agent to the OIDC identity provider (Idp) authentication endpoint, and the user-agent authenticates with the OIDC Idp.
+4. If user authentication is successful, the OIDC Idp redirects the user-agent to the configured ALB `redirect_url` with authorization `code` included in the redirect URL.
+5. ALB uses the authorization `code` to get `access_token` and OpenID JWT token with `"openid email"` scope from the OIDC Idp, and forwards the login request to the Amazon MWAA Authenticator Lambda target with the JWT token included in the request header `x-amzn-oidc-data`.
+6.  Amazon MWAA Authenticator Lambda verifies the JWT token in the request header using ALB public keys, and [authorizes](#add-authorization-records-to-dynamodb-table) the authenticated user for the requested `mwaa_env` and `rbac_role` using a DynamoDB table. The use of DynamoDB for authorization is optional, and the [Lambda code](cdk/mwaa_authx_lambda_code/mwaa_authx.py) function `is_allowed` can be adapted to use other authorization mechanisms.
+7. Amazon MWAA Authenticator Lambda redirects the user-agent to the Apache Airflow console in the requested Amazon MWAA Environment with `login` token included in the `redirect` URL.
+
+This solution architecture assumes that the user-agent has network reachability to the AWS Application Load Balancer and Apache Airflow console endpoints used in this solution. If the endpoints are public, then reachability is over the internet, otherwise, the network reachability is assumed via an [AWS Direct Connect](https://aws.amazon.com/directconnect/), or [AWS Client VPN](https://docs.aws.amazon.com/vpn/latest/clientvpn-admin/what-is.html).
+
+**NOTE: This solution does not setup up AWS Client VPN.**
+
+## Applicable Use cases
+
+Use this solution for the following purposes: 
+
+| Purpose | Description | Sectional Reference |
+|---------|-------------|--------------------|
+|Integrate to a single existing Amazon MWAA environment|  If you are integrating with a single existing Amazon MWAA environment, follow the guides in the Quickstart section. The Quickstart requires that you specify the same ALB VPC as that of your existing Amazon MWAA VPC. You can specify the default Apache Airflow RBAC role that all users will assume. The ALB with an HTTPS listener is configured within your existing Amazon MWAA VPC.| [Quick start](#quick-start) |
+|Integrate to multiple existing Amazon MWAA environments| For connecting to multiple existing Amazon MWAA environments that are already provisioned (either with Public or Private access modes) in your AWS accounts. The setup process will create a new VPC with subnets hosting the ALB and the HTTPS listener. You must define the CIDR range for this ALB VPC such that it does not overlap with the VPC CIDR range of your existing Amazon MWAA VPCs. You can specify the default Apache Airflow RBAC role that all users will assume.| [Integrate to multiple existing Amazon MWAA environments](#integrate-to-multiple-existing-amazon-mwaa-environments)|
+| Create a single new Amazon MWAA environment with built-in integration | For creating a new Amazon MWAA environment, either with Public or Private access mode with in-built OIDC integration. The setup process will create an ALB VPC, an ALB with an HTTPS listener, an AWS Lambda Authorizer, an Amazon DynamoDB table, the respective Amazon MWAA VPCs and an Amazon MWAA environment in them. Further, it creates the VPC peering connection between the ALB VPC and the Amazon MWAA VPC. | [Create a new Amazon MWAA environment](#create-a-new-amazon-mwaa-environment) |
+| Create multiple new Amazon MWAA environments with built-in integration| For creating multiple new Amazon MWAA environments, either with Public or Private access mode with in-built OIDC integration for each of them. The setup process will create an ALB VPC, an ALB with an HTTPS listener, an AWS Lambda Authorizer, an Amazon DynamoDB table, the respective Amazon MWAA VPCs and multiple Amazon MWAA environments in them. Further, it creates the VPC peering connection between the ALB VPC and the Amazon MWAA VPC.| [Create multiple new Amazon MWAA environments](#create-multiple-new-amazon-mwaa-environments) |
+
+
 
 ## Quick start
 
-If you need to use an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) to provide OIDC based SSO to a *single exsiting* MWAA environment with uniform [Apache Airflow RBAC](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) role access, you only need to complete the steps described below in the [Quick start](#quick-start) section. Under this option, all HTTPS traffic between your browser and the MWAA UI console flows through the ALB, and all ALB SSO authenticated users have uniform  access to the single MWAA environment.
+If you need to use an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) to provide OIDC based SSO to a *single exsiting* Amazon MWAA environment with uniform [Apache Airflow RBAC](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) role access, you only need to complete the steps described below in the [Quick start](#quick-start) section. Under this option, all HTTPS traffic between your browser and the Amazon MWAA UI console flows through the ALB, and all ALB SSO authenticated users have uniform  access to the single Amazon MWAA environment.
 
 ### Setup
 
@@ -27,6 +84,63 @@ Complete `Oidc` and `Alb` contexts in [cdk.context.json](cdk/cdk.context.json). 
         "UserInfoEndpoint":"https://xxx.okta.com/oauth2/default/v1/userinfo"
     }
 
+The ALB may be internet facing, or private. By default, the **ALB is private**. Set `InternetFacing` to `true` below for internet facing ALB:
+
+    "Alb": {
+        "InternetFacing": false,
+        "SessionCookieName": "AWSELBAuthSessionCookie",
+        "LogBucketArn": "...",
+        "LogBucketPrefix": "customer-alb",
+        "CertificateArn": "..."
+    }
+
+Complete `QuickStart` in  [cdk.context.json](cdk/cdk.context.json) using information obtained from your *existing* MWAA environment. You must specify at least two subnets in two different AWS availability zones in the `SubnetIds` below. To specify the  `MwaaEndpointIps` below, find the Amazon MWAA endpoint IPs using [AWS console or CLI](https://docs.aws.amazon.com/mwaa/latest/userguide/vpc-vpe-access.html#vpc-vpe-hosts). Valid values for `RbacRoleName` are  `Admin`, `User`, `Viewer`, `Op`, and `Public`.
+
+    "QuickStart": {
+        "VpcId": "...",
+        "SubnetIds": [],
+        "SecurityGroupId": "...",
+        "MwaaEnvironmentName": "...",
+        "RbacRoleName": "Admin",
+        "MwaaEndpointIps": []
+    }
+
+Run following commands:
+
+    cd cdk
+    cdk deploy QuickStartAlb
+
+
+## Integrate to multiple existing Amazon MWAA environments
+
+If you need to use an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) to provide OIDC based SSO to *multiple exsiting* MWAA environment with uniform [Apache Airflow RBAC](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) role access, you only need to complete the steps described below in this section. Under this option, all HTTPS traffic between your browser and the Amazon MWAA UI console flows through the ALB, and all ALB SSO authenticated users have uniform  access to the multiple existing Amazon MWAA environments.
+
+### Setup
+Complete the [prerequisites](#prerequisites), and run the script [setup-venv.sh](setup-venv.sh).
+
+For connecting to multiple existing Amazon MWAA environments, specify only the Amazon MWAA environment name in the JSON [cdk.context.json](cdk/cdk.context.json) file. Complete `Oidc`, `Alb` and `CustomerVpc`  contexts and mention the Amazon MWAA environment names only in the `MwaaEnvironments` context. The setup process will create a new VPC with subnets hosting the ALB and the listener as defined by your `CustomerVpc` section configurations. You must define the CIDR range for this ALB VPC such that it does not overlap with the VPC CIDR range of your existing Amazon MWAA VPCs. 
+
+Example to integrate with two existing Amazon MWAA environments names "Env1" and "Env2":
+
+    "MwaaEnvironments": [
+        {
+        "Name": "Env1"
+        },
+        {
+        "Name": "Env2"
+        }
+    ]
+
+The `Oidc` context specifies the configuration of your OIDC Idp. For example, for [Okta OIDC Idp](https://developer.okta.com/signup/), the configuration would be similar to shown below:
+
+    "Oidc": {
+        "ClientId": "...",
+        "ClientSecretArn": "...",
+        "Issuer": "https://xxx.okta.com/oauth2/default",
+        "AuthorizationEndpoint":"https://xxx.okta.com/oauth2/default/v1/authorize",
+        "TokenEndpoint":"https://xxx.okta.com/oauth2/default/v1/token",
+        "UserInfoEndpoint":"https://xxx.okta.com/oauth2/default/v1/userinfo"
+    }    
 
 The ALB may be internet facing, or private. By default, the **ALB is private**. Set `InternetFacing` to `true` below for internet facing ALB:
 
@@ -38,66 +152,165 @@ The ALB may be internet facing, or private. By default, the **ALB is private**. 
         "CertificateArn": "..."
     }
 
-Complete `QuickStart` in  [cdk.context.json](cdk/cdk.context.json) using information obtained from your *existing* MWAA environment. You must specify at least two subnets in two different AWS availability zones in the `SubnetIds` below. To specify the  `MwaaEndpointIps` below, find the MWAA endpoint IPs using [AWS console or CLI](https://docs.aws.amazon.com/mwaa/latest/userguide/vpc-vpe-access.html#vpc-vpe-hosts). Valid values for `RbacRoleName` are  `Admin`, `User`, `Viewer`, `Op`, and `Public`.
+Run following commands:
 
-    "QuickStart": {
-        "VpcId": "...",
-        "SubnetIds": [],
-        "SecurityGroupId": "...",
-        "MwaaEnvironmentName": "...",
-        "RbacRoleName": "Admin",
-        "MwaaEndpointIps": []
+    cd cdk
+    cdk bootstrap
+    cdk deploy --all
+
+Once the setup steps are complete, implement the [Post deployment configuration steps](#post-deployment-configuration). This includes adding the ALB CNAME record to the Amazon Route 53 DNS domain. 
+
+For integrating with existing Amazon MWAA environments configured using private access mode there are additional steps that need to be configured. These include configuring VPC peering and subnet routes between the new ALB VPC and the existing Amazon MWAA VPC. Additionally, you will need to configure network connectivity from your user-agent to the private ALB endpoint resolved by your DNS domain.
+
+### Additional Details: 
+Visit the [Step-by-step tutorial](#step-by-step-tutorial) section for details on the CDK stack that this solution uses.
+
+## Create a new Amazon MWAA environment
+
+If you need to use an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) to provide OIDC based SSO to a *single new* Amazon MWAA environment with uniform [Apache Airflow RBAC](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) role access, you only need to complete the steps described below in this section. Under this option, all HTTPS traffic between your browser and the MWAA UI console flows through the ALB, and all ALB SSO authenticated users have uniform  access to the newly created Amazon MWAA environment.
+
+### Setup
+Complete the [prerequisites](#prerequisites), and run the script [setup-venv.sh](setup-venv.sh).
+
+For creating a new Amazon MWAA environments, specify the Amazon MWAA environment configurations in the JSON [cdk.context.json](cdk/cdk.context.json) file. Additionally, complete `Oidc`, `Alb` and `CustomerVpc` contexts. The setup process will create a new VPC with subnets hosting the ALB and the HTTPS listener as defined by your `CustomerVpc` section configurations. It will also create a new VPC for your new Amazon MWAA environment in it. Finally it will create the VPC peering connections between the ALB VPC and the Amazon MWAA VPC. 
+
+You can define the `WebServerAccessMode` to be either `PUBLIC_ONLY` or `PRIVATE_ONLY`. You must define the CIDR range for this ALB VPC such that it does not overlap with the VPC CIDR range of your Amazon MWAA VPCs if the new Amazon MWAA environment is being created with PRIVATE_ONLY access. This is because for this solution to work, we need to establish VPC peering connection and subnet routes between the CustomerVpc and the VPC of the new Amazon MWAA Environment with PRIVATE_ONLY access.
+
+The `Oidc` context specifies the configuration of your OIDC Idp. For example, for [Okta OIDC Idp](https://developer.okta.com/signup/), the configuration would be similar to shown below:
+
+    "Oidc": {
+        "ClientId": "...",
+        "ClientSecretArn": "...",
+        "Issuer": "https://xxx.okta.com/oauth2/default",
+        "AuthorizationEndpoint":"https://xxx.okta.com/oauth2/default/v1/authorize",
+        "TokenEndpoint":"https://xxx.okta.com/oauth2/default/v1/token",
+        "UserInfoEndpoint":"https://xxx.okta.com/oauth2/default/v1/userinfo"
+    }    
+
+The ALB may be internet facing, or private. By default, the **ALB is private**. Set `InternetFacing` to `true` below for internet facing ALB:
+
+    "Alb": {
+        "InternetFacing": false,
+        "SessionCookieName": "AWSELBAuthSessionCookie",
+        "LogBucketArn": "...",
+        "LogBucketPrefix": "customer-alb",
+        "CertificateArn": "..."
     }
 
+Define one Amazon MWAA configurations along with its VPC details as defined by the `VpcCIDR`, `MaxAZs`, `NatGateways`, `PublicSubnetMask` and `PrivateSubnetMask` fields.
 
+Example to create a new large, public Amazon MWAA environment named "Env1":
+
+    "MwaaEnvironments": [
+        {
+            "Name": "Env1",
+            "EnvironmentClass": "mw1.large",
+            "SourceBucketArn": "...",
+            "DagsS3Path": "dags",
+            "RequirementsS3Path": "mwaa/requirements-mwaa.txt",
+            "RequirementsS3ObjectVersion": "...",
+            "MinWorkers": 2,
+            "MaxWorkers": 16,
+            "Schedulers": 2,
+            "DagProcessingLogsLevel": "INFO",
+            "SchedulerLogsLevel": "INFO",
+            "TaskLogsLevel": "INFO",
+            "WorkerLogsLevel": "INFO",
+            "WebserverLogsLevel": "INFO",
+            "WebServerAccessMode": "PUBLIC_ONLY", 
+            "ConfigurationOptions": {
+                "core.dag_run_conf_overrides_params": "True"
+            },
+            "VpcCIDR": "172.30.0.0/16",
+            "MaxAZs": 2,
+            "NatGateways": 1,
+            "PublicSubnetMask": 24,
+            "PrivateSubnetMask": 18
+        }]
 
 Run following commands:
 
     cd cdk
-    cdk deploy QuickStartAlb
+    cdk bootstrap
+    cdk deploy --all
 
+Once the setup steps are complete, implement the [Post deployment configuration steps](#post-deployment-configuration). This includes adding the ALB CNAME record to the Amazon Route 53 DNS domain. 
 
-## Solution architecture
+### Additional Details: 
+Visit the [Step-by-step tutorial](#step-by-step-tutorial) section for details on the CDK stack that this solution uses.
 
-The central component of the solution architecture is an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) setup with a fully-qualified domain name (FQDN) and public (internet), or private access. The ALB provides SSO access to one or more MWAA Environments. 
+## Create multiple new Amazon MWAA environments
 
-The user-agent (web browser) call flow for accessing an Apache Airflow console in the target MWAA environment is as follows:
+If you need to use an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) to provide OIDC based SSO to a *multiple new* Amazon MWAA environment with uniform [Apache Airflow RBAC](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) role access, you only need to complete the steps described below in this section. Under this option, all HTTPS traffic between your browser and the Amazon MWAA UI console flows through the ALB, and all ALB SSO authenticated users have uniform  access to the many newly created Amazon MWAA environments.
 
-1. User-agent resolves ALB DNS domain name from DNS resolver. 
-2. User-agent sends login request to the ALB path `/aws_mwaa/aws-console-sso` with the target MWAA Environment and the [Apache Airflow role based access control (RBAC) role](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) in the query parameters `mwaa_env` and `rbac_role`, respectively.
-3. ALB redirects the user-agent to the OIDC identity provider (Idp) authentication endpoint, and the user-agent authenticates with the OIDC Idp.
-4. If user authentication is successful, the OIDC Idp redirects the user-agent to the configured ALB `redirect_url` with authorization `code` included in the redirect URL.
-5. ALB uses the authorization `code` to get `access_token` and OpenID JWT token with `"openid email"` scope from the OIDC Idp, and forwards the login request to the MWAA Authenticator Lambda target with the JWT token included in the request header `x-amzn-oidc-data`.
-6.  MWAA Authenticator Lambda verifies the JWT token in the request header using ALB public keys, and [authorizes](#add-authorization-records-to-dynamodb-table) the authenticated user for the requested `mwaa_env` and `rbac_role` using a DynamoDB table. The use of DynamoDB for authorization is optional, and the [Lambda code](cdk/mwaa_authx_lambda_code/mwaa_authx.py) function `is_allowed` can be adapted to use other authorization mechanisms.
-7. MWAA Authenticator Lambda redirects the user-agent to the Apache Airflow console in the requested MWAA Environment with `login` token included in the `redirect` URL.
+### Setup
+Complete the [prerequisites](#prerequisites), and run the script [setup-venv.sh](setup-venv.sh).
 
+Follow the instruction steps for [Create a new Amazon MWAA environment](#create-a-new-amazon-mwaa-environment) except one deviation. Instead of specifying one Amazon MWAA environment configuration in the `MwaaEnvironments` section of the JSON [cdk.context.json](cdk/cdk.context.json) file, append multiple Amazon MWAA definitions.
 
-This solution architecture assumes that the user-agent has network reachability to the AWS Application Load Balancer and Apache Airflow console endpoints used in this solution. If the endpoints are public, then reachability is over the internet, otherwise, the network reachability is assumed via an [AWS Direct Connect](https://aws.amazon.com/directconnect/), or [AWS Client VPN](https://docs.aws.amazon.com/vpn/latest/clientvpn-admin/what-is.html).
+Example to create two new large Amazon MWAA environment named "Env1" and "Env2":
 
-The solution architecture diagram with numbered call flow sequence for internet network reachability is shown below:
+    "MwaaEnvironments": [
+        {
+            "Name": "Env1",
+            "EnvironmentClass": "mw1.large",
+            "SourceBucketArn": "...",
+            "DagsS3Path": "dags",
+            "RequirementsS3Path": "mwaa/requirements-mwaa.txt",
+            "RequirementsS3ObjectVersion": "...",
+            "MinWorkers": 2,
+            "MaxWorkers": 16,
+            "Schedulers": 2,
+            "DagProcessingLogsLevel": "INFO",
+            "SchedulerLogsLevel": "INFO",
+            "TaskLogsLevel": "INFO",
+            "WorkerLogsLevel": "INFO",
+            "WebserverLogsLevel": "INFO",
+            "WebServerAccessMode": "PUBLIC_ONLY",
+            "ConfigurationOptions": {
+                "core.dag_run_conf_overrides_params": "True"
+            },
+            ...
+        },
+        {
+            "Name": "Env2",
+            "EnvironmentClass": "mw1.large",
+            "SourceBucketArn": "...",
+            "DagsS3Path": "dags",
+            "RequirementsS3Path": "mwaa/requirements-mwaa.txt",
+            "RequirementsS3ObjectVersion": "...",
+            "MinWorkers": 2,
+            "MaxWorkers": 16,
+            "Schedulers": 2,
+            "DagProcessingLogsLevel": "INFO",
+            "SchedulerLogsLevel": "INFO",
+            "TaskLogsLevel": "INFO",
+            "WorkerLogsLevel": "INFO",
+            "WebserverLogsLevel": "INFO",
+            "WebServerAccessMode": "PRIVATE_ONLY",
+            "ConfigurationOptions": {
+                "core.dag_run_conf_overrides_params": "True"
+            },
+            ...
+        }
+    ]
 
-![Internet Solution architecture](images/mwaa-sso-public-call-flow.png)
-
-The solution architecture diagram for AWS Client VPN network reachability is shown below:
-
-![VPN Solution architecture](images/mwaa-sso-private-call-flow.png)
-
-**NOTE: This solution does not setup up AWS Client VPN.**
+### Additional Details: 
+Visit the [Step-by-step tutorial](#step-by-step-tutorial) section for details on the CDK stack that this solution uses.
 
 ## System perspective
-
 The system perspective is useful for building and deploying this solution. This solution comprises of three core CloudFormation stacks defined using AWS CDK: 
 
 * CustomerVpc
 * MwaaAuthxLambda
 * CustomerAlb
 
-Besides the core stacks, this solution supports building MWAA Environment stacks. For each MWAA Environment you want to use in this solution, you must add a dictionary entry in the  `MwaaEnvironments` array in [cdk.context.json](cdk/cdk.context.json). If the array entry contains *only* the `Name` key, this solution assumes such an MWAA Environment is being managed outside this solution, otherwise, two *logical stacks per MWAA Environment* are created in this solution:
+Besides the core stacks, this solution supports building Amazon MWAA Environment stacks. For each Amazon MWAA Environment you want to use in this solution, you must add a dictionary entry in the  `MwaaEnvironments` array in [cdk.context.json](cdk/cdk.context.json). If the array entry contains *only* the `Name` key, this solution assumes such an Amazon MWAA Environment is being managed outside this solution, otherwise, two *logical stacks per Amazon MWAA Environment* are created in this solution:
 
 * MwaaVpc
 * MwaaEnvironment
 
-The [cdk.context.json](cdk/cdk.context.json) file included in this project is configured to create two new MWAA Environments: `Env1` with `PUBLIC_ONLY` access, and `Env2` with `PRIVATE_ONLY` access, which means following CloudFormation stacks are defined in this solution, in addition to the core stacks:
+The [cdk.context.json](cdk/cdk.context.json) file included in this project is configured to create two new Amazon MWAA Environments: `Env1` with `PUBLIC_ONLY` access, and `Env2` with `PRIVATE_ONLY` access, which means following CloudFormation stacks are defined in this solution, in addition to the core stacks:
 
 * MwaaVpcEnv1
 * MwaaEnvironmentEnv1
@@ -106,11 +319,11 @@ The [cdk.context.json](cdk/cdk.context.json) file included in this project is co
 
 ## User perspective
 
-The user perspective is useful for understanding how to access a target MWAA Environment assuming a specific Airflow RBAC role.
+The user perspective is useful for understanding how to access a targe Amazon MWAA Environment assuming a specific Airflow RBAC role.
 
-### MWAA Airflow console login and logout
+### Amazon MWAA Airflow console login and logout
 
-For `login` into Apache Airflow console in the target MWAA Environment assuming a specific Apache Airflow RBAC role, we use following URL:
+For `login` into Apache Airflow console in the target Amazon MWAA Environment assuming a specific Apache Airflow RBAC role, we use following URL:
 
 ```
 https://FQDN/aws_mwaa/aws-console-sso?mwaa_env=<MWAA-Environment-Name>&rbac_role=<Rbac-role-name>
@@ -137,7 +350,7 @@ Before we can deploy this solution, we need to complete following prerequisites:
 5. [SSL certificate](#ssl-certificate)
 6. [Open Id connect (OIDC) identity provider](#oidc-idp)
 7. [Service linked role for EC2 auto-scaling](#service-linked-role-for-ec2-auto-scaling)
-8. [MWAA Environment source bucket](#mwaa-environment-source-bucket)
+8. [Amazon MWAA Environment source bucket](#mwaa-environment-source-bucket)
 9. [Application load balancer (ALB) access logging bucket](#application-load-balancer-alb-access-logging-bucket)
 
 ### AWS account access
@@ -185,9 +398,9 @@ The OIDC Idp must support scope of `"openid email"`. The `redirect_url` and `log
 
 ### MWAA Environment source bucket
 
-If you plan to use this solution to automatically create MWAA Environments, create or use an existing Amazon S3 bucket with versioning enabled. Later, you will use the S3 bucket ARN in CDK context variable `SourceBucketArn` in various `MWAAEnvironments` array entries in [cdk.context.json](cdk/cdk.context.json) while configuring various MWAA Environment related stacks in the [step-by-step tutorial](#step-by-step-tutorial).
+If you plan to use this solution to automatically create Amazon MWAA Environments, create or use an existing Amazon S3 bucket with versioning enabled. Later, you will use the S3 bucket ARN in CDK context variable `SourceBucketArn` in various `MWAAEnvironments` array entries in [cdk.context.json](cdk/cdk.context.json) while configuring various Amazon MWAA Environment related stacks in the [step-by-step tutorial](#step-by-step-tutorial).
 
-At this time, copy [requirements-mwaa.txt](cdk/requirements-mwaa.txt) to the `SourceBucketArn` bucket to the bucket path `mwaa/requirements-mwaa.txt`. Note the object version of the object you just copied and later use it in `RequirementsS3ObjectVersion` in various `MWAAEnvironments` array entries in [cdk.context.json](cdk/cdk.context.json) while configuring various MWAA Environment related stacks in the [step-by-step tutorial](#step-by-step-tutorial).
+At this time, copy [requirements-mwaa.txt](cdk/requirements-mwaa.txt) to the `SourceBucketArn` bucket to the bucket path `mwaa/requirements-mwaa.txt`. Note the object version of the object you just copied and later use it in `RequirementsS3ObjectVersion` in various `MWAAEnvironments` array entries in [cdk.context.json](cdk/cdk.context.json) while configuring various Amazon MWAA Environment related stacks in the [step-by-step tutorial](#step-by-step-tutorial).
 
 ### Application load balancer (ALB) access logging bucket
 
@@ -248,15 +461,15 @@ An example `CustomerVpc` CDK context defined in [cdk.context.json](cdk/cdk.conte
 
 You are free to change the `CustomerVpc` context, as needed. 
 
-**NOTE:** The `VpcCIDR `of the `CustomerVpc` must not overlap with the VPC of any MWAA Environment with `PRIVATE_ONLY` access. This is because, for this solution to work, we need to establish VPC peering connection and subnet routes between the `CustomerVpc` and the VPC of an MWAA Environment with `PRIVATE_ONLY` access. 
+**NOTE:** The `VpcCIDR `of the `CustomerVpc` must not overlap with the VPC of any Amazon MWAA Environment with `PRIVATE_ONLY` access. This is because, for this solution to work, we need to establish VPC peering connection and subnet routes between the `CustomerVpc` and the VPC of an Amazon MWAA Environment with `PRIVATE_ONLY` access. 
 
-If the MWAA VPC is created by this solution, the required VPC peering connection and subnet routes are automatically configured. If you are directly managing an MWAA Environment with `PRIVATE_ONLY` access and want to access such an MWAA Environment through this solution, you must create VPC peering connection and subnet routes between `CustomerVpc` and your MWAA VPC.
+If the Amazon MWAA VPC is created by this solution, the required VPC peering connection and subnet routes are automatically configured. If you are directly managing an Amazon MWAA Environment with `PRIVATE_ONLY` access and want to access such an Amazon MWAA Environment through this solution, you must create VPC peering connection and subnet routes between `CustomerVpc` and your Amazon MWAA VPC.
 
 #### MwaaAuthxLambda stack
 
-This stack deploys the Lambda function used for authorization. The authorization function enables access to the various MWAA Environments' Apache Airflow UI consoles. 
+This stack deploys the Lambda function used for authorization. The authorization function enables access to the various Amazon MWAA Environments' Apache Airflow UI consoles. 
 
-This stack creates an Amazon DynamoDB table used for mapping users and MWAA Environments to allowed [Apache Airflow RBAC roles](https://airflow.apache.org/docs/apache-airflow/stable/security/access-control.html).
+This stack creates an Amazon DynamoDB table used for mapping users and Amazon MWAA Environments to allowed [Apache Airflow RBAC roles](https://airflow.apache.org/docs/apache-airflow/stable/security/access-control.html).
 
 The CDK `Alb` context variable `SessionCookieName` defined in [cdk.context.json](cdk/cdk.context.json) is used by this stack. 
 
@@ -266,7 +479,7 @@ The `MwaaVpc` stack creates a secure VPC with private and public subnets for run
 
 The public subnets have direct access to the Internet. The private subnets have outbound access to the Internet via a NAT Gateway. VPC is connected to the relevant AWS services using VPC endpoints. VPC Flow Logs are enabled. 
 
-The CDK context for each `MwaaVpc` is defined in each `MwaaEnvironments` array entry, as shown in the example below for two MWAA Environments named `Env1` and `Env2`, respectively:
+The CDK context for each `MwaaVpc` is defined in each `MwaaEnvironments` array entry, as shown in the example below for two Amazon MWAA Environments named `Env1` and `Env2`, respectively:
 
     "MwaaEnvironments": [
         {
@@ -291,11 +504,11 @@ The CDK context for each `MwaaVpc` is defined in each `MwaaEnvironments` array e
         }
     ],
 
-**NOTE:** The `VpcCIDR `of the `MwaaVpc` must not overlap with the `CustomerVpc` if the Environment has `PRIVATE_ONLY` access. This is because for this solution to work, we need to establish VPC peering connection and subnet routes between the `CustomerVpc` and the VPC of any MWAA Environment with `PRIVATE_ONLY` access.
+**NOTE:** The `VpcCIDR `of the `MwaaVpc` must not overlap with the `CustomerVpc` if the Environment has `PRIVATE_ONLY` access. This is because for this solution to work, we need to establish VPC peering connection and subnet routes between the `CustomerVpc` and the VPC of any Amazon MWAA Environment with `PRIVATE_ONLY` access.
 
 #### MwaaEnvironment stack
 
-Each `MwaaEnvironment` stack depends on the corresponding `MwaaVpc` stack. The CDK context for each `MwaaEnvironment` stack is defined in `MwaaEnvironments` array entry, as shown in the example below for two MWAA Environments named `Env1` and `Env2`, respectively:
+Each `MwaaEnvironment` stack depends on the corresponding `MwaaVpc` stack. The CDK context for each `MwaaEnvironment` stack is defined in `MwaaEnvironments` array entry, as shown in the example below for two Amazon MWAA Environments named `Env1` and `Env2`, respectively:
 
     "MwaaEnvironments": [
         {
@@ -351,7 +564,7 @@ The `CustomerAlb` stack defines the following:
 * Application load balancer (ALB) used for OIDC SSO authentication
 * Authorization Lambda ALB target
 * HTTPS listener
-* Vpc peering connection and subnet Routes between `CustomerVpc` *private subnets*, and each MWAA Environment's VPC with `PRIVATE_ONLY` access. This is done only for MWAA Environments managed by this solution.
+* Vpc peering connection and subnet Routes between `CustomerVpc` *private subnets*, and each MWAA Environment's VPC with `PRIVATE_ONLY` access. This is done only for Amazon MWAA Environments managed by this solution.
 
 The CDK context for the `CustomerAlb` stack is defined in `Oidc` and `Alb` contexts in [cdk.context.json](cdk/cdk.context.json). The `Oidc` context specifies the configuration of your OIDC Idp. For example, for [Okta OIDC Idp](https://developer.okta.com/signup/), the configuration would be similar to shown below:
 
@@ -413,7 +626,7 @@ To deploy the stacks one at a time, execute following commands in sequence:
 
 #### Configure Vpc peering and subnet routes for external PRIVATE_ONLY MWAA Environments
 
-If you are externally managing an MWAA Environment with `PRIVATE_ONLY` access and want to access such an MWAA Environment through this solution, you must create VPC peering connection and subnet routes between `CustomerVpc` and your MWAA VPC.
+If you are externally managing an Amazon MWAA Environment with `PRIVATE_ONLY` access and want to access such an Amazon MWAA Environment through this solution, you must create VPC peering connection and subnet routes between `CustomerVpc` and your Amazon MWAA VPC.
 
 #### Add ALB CNAME record in your Route 53 DNS domain
 
@@ -421,7 +634,7 @@ In your Route 53 DNS domain, add a [CNAME record](https://aws.amazon.com/premium
 
 #### Add authorization records to DynamoDB table
 
-In the DynamoDB table created in `MwaaAuthxLambda` stack, add entry for each user's email, MWAA Environment name, and allowed [Apache Airflow RBAC roles](https://airflow.apache.org/docs/apache-airflow/stable/security/access-control.html). 
+In the DynamoDB table created in `MwaaAuthxLambda` stack, add entry for each user's email, Amazon MWAA Environment name, and allowed [Apache Airflow RBAC roles](https://airflow.apache.org/docs/apache-airflow/stable/security/access-control.html). 
 
 For example, your Amazon DynamoDB table may look as below:
 
@@ -434,22 +647,22 @@ For example, your Amazon DynamoDB table may look as below:
 
 Valid values for `rbac_roles` column are  `Admin`, `User`, `Viewer`, `Op`, and `Public`. Multiple values in the `rbac_roles` column can be space-separated. The value `All` in `rbac_roles` means all RBAC roles are allowed.
 
-#### Configure network connectivity to ALB and PRIVATE_ONLY MWAA Environments
+#### Configure network connectivity to ALB and PRIVATE_ONLY Amazon MWAA Environments
 
-If the `Alb` CDK context variable `InternetFacing` is set to `false` in [cdk.context.json](cdk/cdk.context.json) , configure network connectivity from your user-agent to the private ALB endpoint resolved by your DNS domain. Also, you must configure network connectivity from your user-agent to the Apache Airflow console in your target `PRIVATE_ONLY` access MWAA Environments. This can be done using [AWS Direct Connect](https://aws.amazon.com/directconnect/), or [AWS Client VPN](https://docs.aws.amazon.com/vpn/latest/clientvpn-admin/what-is.html). This solution does not setup AWS Direct Connect, or AWS Client VPN.
+If the `Alb` CDK context variable `InternetFacing` is set to `false` in [cdk.context.json](cdk/cdk.context.json) , configure network connectivity from your user-agent to the private ALB endpoint resolved by your DNS domain. Also, you must configure network connectivity from your user-agent to the Apache Airflow console in your target `PRIVATE_ONLY` access Amazon MWAA Environments. This can be done using [AWS Direct Connect](https://aws.amazon.com/directconnect/), or [AWS Client VPN](https://docs.aws.amazon.com/vpn/latest/clientvpn-admin/what-is.html). This solution does not setup AWS Direct Connect, or AWS Client VPN.
 
 ### Login into MWAA Airflow console
 
-Assuming your ALB FQDN is `alb-sso-mwaa.example.com`, you can login into your target MWAA Environment, e.g. `Env1`, assuming a specific Apache Airflow RBAC role, e.g. `Admin`, using the following URL:
+Assuming your ALB FQDN is `alb-sso-mwaa.example.com`, you can login into your target Amazon MWAA Environment, e.g. `Env1`, assuming a specific Apache Airflow RBAC role, e.g. `Admin`, using the following URL:
 
 ```
 https://alb-sso-mwaa.example.com/aws_mwaa/aws-console-sso?mwaa_env=Env1&rbac_role=Admin
 ```
 
-Allowed values for `mwaa_env` query parameter above are the available MWAA environments configured with this solution. Allowed values for `rbac_role` query parameter above are  `Admin`, `User`, `Viewer`, `Op`, and `Public`. 
+Allowed values for `mwaa_env` query parameter above are the available Amazon MWAA environments configured with this solution. Allowed values for `rbac_role` query parameter above are  `Admin`, `User`, `Viewer`, `Op`, and `Public`. 
 
 
-### Logout from MWAA Airflow console
+### Logout from Amazon MWAA Airflow console
 
 For logout from an Apache Airflow Console, use the normal Airflow console logout. 
 

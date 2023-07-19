@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is the accompanying solution to the AWS blogpost "Automating secure access to multiple Amazon MWAA environments using existing OpenID Connect (OIDC) single-sign-on (SSO) authentication and authorization"
+This is the accompanying solution to the AWS blogpost "[Automating secure access to multiple Amazon MWAA environments using existing OpenID Connect (OIDC) single-sign-on (SSO) authentication and authorization](https://aws.amazon.com/blogs/big-data/automate-secure-access-to-amazon-mwaa-environments-using-existing-openid-connect-single-sign-on-authentication-and-authorization/)"
 
 This solution enables OpenID Connect (OIDC) single-sign-on (SSO) authentication and authorization for accessing [Apache Airflow](https://airflow.apache.org/docs/apache-airflow/stable/index.html) UI across multiple existing [Amazon Managed Workflows for Apache Airflow (MWAA)](https://aws.amazon.com/managed-workflows-for-apache-airflow/) Environments. 
 

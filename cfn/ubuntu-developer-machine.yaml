@@ -292,7 +292,7 @@ Resources:
               npm install -g aws-cdk
 
               # Link python to python3
-              ln -s /usr/bin/python3 /usr/bin/python
+              [[ -f /usr/bin/python ]] || ln -s /usr/bin/python3 /usr/bin/python
 
               # install pip
               apt-get install -y python3-pip

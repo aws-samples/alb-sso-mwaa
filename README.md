@@ -114,7 +114,7 @@ Run following commands:
 
 ## Integrate to multiple existing Amazon MWAA environments
 
-If you need to use an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) to provide OIDC based SSO to *multiple exsiting* MWAA environment with uniform [Apache Airflow RBAC](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) role access, you only need to complete the steps described below in this section. Under this option, all HTTPS traffic between your browser and the Amazon MWAA UI console flows through the ALB, and all ALB SSO authenticated users have uniform  access to the multiple existing Amazon MWAA environments.
+If you need to use an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) to provide OIDC based SSO to *multiple exsiting* MWAA environment with uniform [Apache Airflow RBAC](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) role access, you only need to complete the steps described below in this section. Under this option, all HTTPS traffic from your browser to the Amazon MWAA UI console flows directly, following successful OIDC based SSO.
 
 ### Setup
 Complete the [prerequisites](#prerequisites), and run following command:
@@ -158,7 +158,9 @@ The ALB may be internet facing, or private. By default, the **ALB is private**. 
 Run following commands:
 
     cdk bootstrap
-    cdk deploy --all
+    cdk deploy CustomerVpc
+    cdk deploy MwaaAuthxLambda
+    cdk deploy CustomerAlb
 
 Once the setup steps are complete, implement the [Post deployment configuration steps](#post-deployment-configuration). This includes adding the ALB CNAME record to the Amazon Route 53 DNS domain. 
 
@@ -169,7 +171,7 @@ Visit the [Step-by-step tutorial](#step-by-step-tutorial) section for details on
 
 ## Create a new Amazon MWAA environment
 
-If you need to use an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) to provide OIDC based SSO to a *single new* Amazon MWAA environment with uniform [Apache Airflow RBAC](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) role access, you only need to complete the steps described below in this section. Under this option, all HTTPS traffic between your browser and the MWAA UI console flows through the ALB, and all ALB SSO authenticated users have uniform  access to the newly created Amazon MWAA environment.
+If you need to use an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) to provide OIDC based SSO to a *single new* Amazon MWAA environment with uniform [Apache Airflow RBAC](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) role access, you only need to complete the steps described below in this section. Under this option, all HTTPS traffic from your browser to the Amazon MWAA UI console flows directly, following successful OIDC based SSO.
 
 ### Setup
 Complete the [prerequisites](#prerequisites), and run following command:
@@ -233,10 +235,14 @@ Example to create a new large, public Amazon MWAA environment named "Env1":
             "PrivateSubnetMask": 18
         }]
 
-Run following commands:
+Run following commands, replacing `Env1` below in commands with the name of your Mwaa Environment:
 
     cdk bootstrap
-    cdk deploy --all
+    cdk deploy CustomerVpc
+    cdk deploy MwaaVpcEnv1
+    cdk deploy MwaaAuthxLambda
+    cdk deploy MwaaEnvironmentEnv1
+    cdk deploy CustomerAlb
 
 Once the setup steps are complete, implement the [Post deployment configuration steps](#post-deployment-configuration). This includes adding the ALB CNAME record to the Amazon Route 53 DNS domain. 
 
@@ -245,14 +251,14 @@ Visit the [Step-by-step tutorial](#step-by-step-tutorial) section for details on
 
 ## Create multiple new Amazon MWAA environments
 
-If you need to use an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) to provide OIDC based SSO to a *multiple new* Amazon MWAA environment with uniform [Apache Airflow RBAC](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) role access, you only need to complete the steps described below in this section. Under this option, all HTTPS traffic between your browser and the Amazon MWAA UI console flows through the ALB, and all ALB SSO authenticated users have uniform  access to the many newly created Amazon MWAA environments.
+If you need to use an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) to provide OIDC based SSO to a *multiple new* Amazon MWAA environment with uniform [Apache Airflow RBAC](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/security/access-control.html) role access, you only need to complete the steps described below in this section. Under this option, all HTTPS traffic from your browser to the Amazon MWAA UI console flows directly, following successful OIDC based SSO.
 
 ### Setup
 Complete the [prerequisites](#prerequisites), and run following command:
 
     source setup-venv.sh
 
-Follow the instruction steps for [Create a new Amazon MWAA environment](#create-a-new-amazon-mwaa-environment) except one deviation. Instead of specifying one Amazon MWAA environment configuration in the `MwaaEnvironments` section of the JSON [cdk.context.json](cdk/cdk.context.json) file, append multiple Amazon MWAA definitions.
+Follow the instruction steps for [Create a new Amazon MWAA environment](#create-a-new-amazon-mwaa-environment) except one deviation: Instead of specifying one Amazon MWAA environment configuration in the `MwaaEnvironments` section of the JSON [cdk.context.json](cdk/cdk.context.json) file, append multiple Amazon MWAA definitions.
 
 Example to create two new large Amazon MWAA environment named "Env1" and "Env2":
 
@@ -300,6 +306,17 @@ Example to create two new large Amazon MWAA environment named "Env1" and "Env2":
             ...
         }
     ]
+
+Run following commands, replacing `Env1` and `Env2` below in commands with the name of your Mwaa Environment:
+
+    cdk bootstrap
+    cdk deploy CustomerVpc
+    cdk deploy MwaaVpcEnv1
+    cdk deploy MwaaVpcEnv2
+    cdk deploy MwaaAuthxLambda
+    cdk deploy MwaaEnvironmentEnv1
+    cdk deploy MwaaEnvironmentEnv2
+    cdk deploy CustomerAlb
 
 ### Additional Details: 
 Visit the [Step-by-step tutorial](#step-by-step-tutorial) section for details on the CDK stack that this solution uses.
@@ -614,11 +631,7 @@ If the command is successful, you should see stack list *similar* to the example
 * MwaaEnvironmentEnv2
 * CustomerAlb
 
-To interactively deploy all the available CDK stacks, execute:
-
-    cdk deploy --all
-
-To deploy the stacks one at a time, execute following commands in sequence:
+To deploy the stacks, execute following commands in sequence:
 
     cdk deploy CustomerVpc
     cdk deploy MwaaVpcEnv1

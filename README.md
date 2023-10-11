@@ -96,7 +96,7 @@ The ALB may be internet facing, or private. By default, the **ALB is private**. 
         "CertificateArn": "..."
     }
 
-Complete `QuickStart` in  [cdk.context.json](cdk/cdk.context.json) using information obtained from your *existing* MWAA environment. You must specify at least two subnets in two different AWS availability zones in the `SubnetIds` below. To specify the  `MwaaEndpointIps` below, find the Amazon MWAA endpoint IPs using [AWS console or CLI](https://docs.aws.amazon.com/mwaa/latest/userguide/vpc-vpe-access.html#vpc-vpe-hosts). Valid values for `RbacRoleName` are  `Admin`, `User`, `Viewer`, `Op`, and `Public`.
+Complete `QuickStart` in  [cdk.context.json](cdk/cdk.context.json) using information obtained from your *existing* MWAA environment. The `VpcId` below must be the same as the customer VPC Id for your existing MWAA environment. You must specify at least two `SubnetIds` from your `VpcId` residing in two different AWS availability zones. The `SubnetIds` must be for **public subnets** if you set `InternetFacing` to `true` in `Alb` above, or they must be for **private subnets**. The `SecurityGroupId` you specify below must allow HTTPs access for the user-agent (your browser), and you would need to ensure that the security group of your MWAA environment allows access from the `Alb` load-balancer. **Note:** The `Alb` will be created in the customer VPC of your existing MWAA environment. To specify the  `MwaaEndpointIps` below, find the Amazon MWAA endpoint IPs using [AWS console or CLI](https://docs.aws.amazon.com/mwaa/latest/userguide/vpc-vpe-access.html#vpc-vpe-hosts). Valid values for `RbacRoleName` below are  `Admin`, `User`, `Viewer`, `Op`, and `Public`.
 
     "QuickStart": {
         "VpcId": "...",

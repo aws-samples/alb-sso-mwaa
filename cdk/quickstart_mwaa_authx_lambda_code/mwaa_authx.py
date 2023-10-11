@@ -23,6 +23,7 @@ import boto3
 from uuid import uuid4
 from datetime import timezone, datetime
 import re
+from botocore.config import Config
 
 
 sts = boto3.client('sts')
@@ -131,7 +132,7 @@ def login(headers, user_claims=None):
         if not is_allowed(email=email, rbac_role=rbac_role_name, mwaa_env=mwaa_env_name):
             return close(headers=headers, message=f"Not authorized: {mwaa_env_name}: {rbac_role_name}", status_code=403)
 
-        mwaa = get_mwaa_client(role_arn)
+        mwaa = get_mwaa_client(role_arn, user=email)
         
         logger.info(f"Create Airflow web login token for environment: '{mwaa_env_name}'")
         if mwaa_env_name:
@@ -153,7 +154,7 @@ def login(headers, user_claims=None):
         
     return redirect
 
-def get_mwaa_client(role_arn):
+def get_mwaa_client(role_arn, user):
     """
     Returns an Amazon MWAA client under the given IAM
     role
@@ -166,12 +167,14 @@ def get_mwaa_client(role_arn):
         credentials = response.get('Credentials')
   
         # create service client using the assumed role credentials, e.g. S3
+        config = Config(user_agent=user)
         mwaa = boto3.client(
             'mwaa',
             aws_access_key_id=credentials.get('AccessKeyId'),
             aws_secret_access_key=credentials.get('SecretAccessKey'),
             aws_session_token=credentials.get('SessionToken'),
-            region_name = AWS_REGION)
+            region_name = AWS_REGION,
+            config=config)
     except Exception as error:
         logger.error(str(error))
     return mwaa

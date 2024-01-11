@@ -77,25 +77,25 @@ Parameters:
 Mappings:
   UbuntuPro2204LTS:
     us-east-1:
-      AMI: ami-0849d760c131d2ae7
+      AMI: ami-0c460fdf6a8a1edef
     us-east-2:
-      AMI: ami-0de19b31027aa3556
+      AMI: ami-0bddc40b31973ff95
     us-west-2:
-      AMI: ami-0a025cd581aa80623
+      AMI: ami-058168290d30b9c52
     eu-west-1:
-      AMI: ami-06d076a224fc9d4cf
+      AMI: ami-0a0aadde3561fdc1e
     eu-central-1:
-      AMI: ami-0f012ece49d117358
+      AMI: ami-04bd4f5e1a831e002
     ap-southeast-1:
-      AMI: ami-0877ab34f6e8ed25d
+      AMI: ami-0fd4144f52678fe37
     ap-southeast-2:
-      AMI: ami-01b41e8d3dc06ee9e
+      AMI: ami-0ac438f9a63fdd525
     ap-south-1:
-      AMI: ami-01007eef7010318b6
+      AMI: ami-05205cb302b6dca6f
     ap-northeast-1:
-      AMI: ami-0cb1490955e291a4a
+      AMI: ami-096d2286904664854
     ap-northeast-2:
-      AMI: ami-07b1dbd222ca38f4a
+      AMI: ami-00324b863a508e247
 
 Conditions:
   OverrideAMI: !Not 
@@ -260,10 +260,14 @@ Resources:
               export DEBCONF_NONINTERACTIVE_SEEN=true
 
               # setup software repo for docker
-              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
-              apt-key fingerprint 0EBFCD88
-              add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+              wget -qO - https://download.docker.com/linux/ubuntu/gpg > ./GPG_DOCKER.PUB
+              gpg --no-default-keyring --keyring ./docker_keyring.gpg --import  ./GPG_DOCKER.PUB
+              gpg --no-default-keyring --keyring ./docker_keyring.gpg  --export > ./docker.gpg
+              mv ./docker.gpg /etc/apt/trusted.gpg.d/
+              rm ./GPG_DOCKER.PUB
    
+              add-apt-repository -y  "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+
               # update and install required packages
               apt-get update
 

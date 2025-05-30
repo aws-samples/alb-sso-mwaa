@@ -170,7 +170,8 @@ class QuickStartStack(Stack):
         
         function.add_permission("LambdaTgInvoke", 
             principal=aws_iam.ServicePrincipal("elasticloadbalancing.amazonaws.com"),
-            action="lambda:InvokeFunction")
+            action="lambda:InvokeFunction",
+            source_account=Aws.ACCOUNT_ID)
 
         self.__oidc_context = self.node.try_get_context("Oidc")
         oidc_client_secret_arn = self.__oidc_context.get("ClientSecretArn")

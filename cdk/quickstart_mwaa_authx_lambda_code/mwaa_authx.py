@@ -53,6 +53,8 @@ def lambda_handler(event, context):
     
         if path == '/aws_mwaa/aws-console-sso':
             redirect = login(headers=headers, user_claims=user_claims)
+        elif path == '/logout/':
+            redirect = logout(headers=headers)      
         else:
             redirect = close(headers, f"Bad request: {path}, {headers}", status_code=400)
     elif path == '/logout':
